@@ -1798,16 +1798,30 @@ async function renderPortalGestionador(container, user) {
     total: 0, solicitados: 0, programados: 0, activosPlanta: 0, enAlquiler: 0, desarmesPendientes: 0, m3ActivosPlanta: 0, m2ActivosPlanta: 0
   };
 
+  const todas = AppState.todasSolicitudesGestionador || [];
+  const deshabilitadosHSECount = todas.filter(s => s.estado === 'DESHABILITADO_HSE').length;
+  const esHSE = (user.email === 'auditor.hse@arauco.com') || (user.sector && user.sector.includes('HSE'));
+
+  if (esHSE && (!AppState.activeTabGestionador || AppState.activeTabGestionador === 'semanal')) {
+    AppState.activeTabGestionador = 'auditoria';
+  }
+
+  const tituloPortal = esHSE ? '🦺 Centro de Control de Seguridad & Higiene (HSE)' : '🛡️ Centro de Control del Gestionador';
+  const badgeRol = esHSE ? 'Seguridad HSE ARAUCO' : 'Admin ARAUCO';
+  const subTituloPortal = esHSE ?
+    `Auditor HSE: <strong>${user.nombre}</strong> | Inspección en Terreno & Control de Condiciones Seguras de Andamios` :
+    `Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación`;
+
   container.innerHTML = `
     <div class="info-card dashboard-hero">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
         <div>
           <h2 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-            🛡️ Centro de Control del Gestionador
-            <span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 600;">Admin ARAUCO</span>
+            ${tituloPortal}
+            <span style="font-size: 0.72rem; background: ${esHSE ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.15)'}; color: ${esHSE ? '#fca5a5' : '#38bdf8'}; border: 1px solid ${esHSE ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.3)'}; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 600;">${badgeRol}</span>
           </h2>
           <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0 0;">
-            Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación
+            ${subTituloPortal}
           </p>
         </div>
       </div>
@@ -1823,8 +1837,8 @@ async function renderPortalGestionador(container, user) {
           <div class="calc-label">Activos en Planta</div>
         </div>
         <div class="calc-box-compact">
-          <div class="calc-val" style="color: #ef4444;">${m.enAlquiler}</div>
-          <div class="calc-label">En Alquiler (>30d)</div>
+          <div class="calc-val" style="color: ${deshabilitadosHSECount > 0 ? '#ef4444' : '#64748b'}; font-weight: 900;">${deshabilitadosHSECount}</div>
+          <div class="calc-label" style="color: ${deshabilitadosHSECount > 0 ? '#fca5a5' : 'var(--text-muted)'};">Deshabilitados HSE ⛔</div>
         </div>
         <div class="calc-box-compact">
           <div class="calc-val" style="color: #f59e0b;">${m.desarmesPendientes}</div>
@@ -1849,8 +1863,8 @@ async function renderPortalGestionador(container, user) {
       <button class="tab-btn ${AppState.activeTabGestionador === 'certificacion' ? 'active' : ''}" onclick="cambiarTabGestionador('certificacion')">
         📑 4. Certificación
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'auditoria' ? 'active' : ''}" onclick="cambiarTabGestionador('auditoria')">
-        🔍 5. Auditoría
+      <button class="tab-btn ${AppState.activeTabGestionador === 'auditoria' ? 'active' : ''}" onclick="cambiarTabGestionador('auditoria')" style="${deshabilitadosHSECount > 0 ? 'border-bottom: 2px solid #ef4444; color: #f87171;' : ''}">
+        🦺 5. Seg. & Higiene ${deshabilitadosHSECount > 0 ? `<span style="background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">${deshabilitadosHSECount} ⚠️</span>` : ''}
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'kpis' ? 'active' : ''}" onclick="cambiarTabGestionador('kpis')">
         📈 6. Métricas (${m.m3ActivosPlanta} m³)
@@ -3039,137 +3053,190 @@ function renderKPIsGestionador(container) {
 }
 
 /* ========================================================
-   MESA DE AUDITORÍA Y RECTIFICACIÓN PRE-CERTIFICACIÓN
+   MESA DE SEGURIDAD E HIGIENE (HSE) — CONTROL OPERATIVO EN PLANTA
    ======================================================== */
 function renderAuditoriaGestionador(container) {
-  const todas = AppState.todasSolicitudesGestionador;
-  const computables = todas.filter(s => ['HABILITADO', 'EN_ALQUILER', 'DESARME_SOLICITADO', 'DESARMADO'].includes(s.estado));
+  const todas = AppState.todasSolicitudesGestionador || [];
+  const computables = todas.filter(s => ['HABILITADO', 'EN_ALQUILER', 'DESHABILITADO_HSE', 'DESARME_SOLICITADO', 'DESARMADO'].includes(s.estado));
 
   const total = computables.length;
-  const validados = computables.filter(s => s.estadoAuditoria === 'VALIDADO').length;
-  const rectificados = computables.filter(s => s.estadoAuditoria === 'RECTIFICADO').length;
-  const observados = computables.filter(s => s.estadoAuditoria === 'OBSERVADO').length;
-  const pendientes = computables.filter(s => !s.estadoAuditoria || s.estadoAuditoria === 'PENDIENTE_AUDITORIA').length;
+  const deshabilitadosHSE = computables.filter(s => s.estado === 'DESHABILITADO_HSE').length;
+  const habilitadosSeguros = computables.filter(s => ['HABILITADO', 'EN_ALQUILER'].includes(s.estado)).length;
+  const subsanacionesPendientes = computables.filter(s => s.eventoSeguridadHSE?.subsanacionContratista && !s.eventoSeguridadHSE.subsanado).length;
 
   container.innerHTML = `
-    <div class="info-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div class="info-card" style="padding: 0.75rem 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
         <div>
-          <h3>🔍 Mesa de Auditoría & Rectificación Técnica Pre-Certificación</h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">
-            Audita en terreno las dimensiones informadas por los contratistas, aprueba el metraje o rectifica antes de certificar.
+          <h3 style="margin: 0; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            🦺 Mesa de Control de Seguridad & Higiene (Auditoría HSE en Planta)
+            ${deshabilitadosHSE > 0 ? `<span style="background: #dc2626; color: #fff; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; animation: pulse 1.5s infinite;">⚠️ ${deshabilitadosHSE} ANDAMIOS BLOQUEADOS</span>` : ''}
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
+            Supervisión técnica de condiciones seguras de uso, detección de partes faltantes o dañadas, armado deficiente y deshabilitación con registro fotográfico oficial.
           </p>
         </div>
-        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-          <input type="text" id="filtroAuditoria" placeholder="Buscar por N°, tarjeta, ubicación..." style="padding: 0.4rem 0.7rem; font-size: 0.85rem; width: 240px;" oninput="filtrarTablaAuditoria()">
+        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+          <select id="filtroEstadoHSE" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; width: auto; background: var(--bg-input); color: #fff; border: 1px solid var(--border); border-radius: 4px;" onchange="filtrarTablaSeguridadHSE()">
+            <option value="TODOS">Todos los Andamios</option>
+            <option value="DESHABILITADOS" ${deshabilitadosHSE > 0 ? 'selected' : ''}>🔴 Deshabilitados HSE (${deshabilitadosHSE})</option>
+            <option value="SUBSANADOS">🟡 Subsanación Enviada (${subsanacionesPendientes})</option>
+            <option value="HABILITADOS">🟢 Habilitados Seguros (${habilitadosSeguros})</option>
+          </select>
+          <input type="text" id="filtroSeguridadInput" placeholder="🔍 Buscar N°, tarjeta, ubicación, contratista..." style="padding: 0.3rem 0.6rem; font-size: 0.8rem; width: 230px;" oninput="filtrarTablaSeguridadHSE()">
         </div>
       </div>
 
-      <div class="grid-4" style="gap: 0.75rem; margin-bottom: 1.25rem;">
-        <div class="calc-box" style="padding: 0.5rem 0.8rem;">
-          <div class="calc-val" style="color: #f59e0b; font-size: 1.25rem;">${pendientes}</div>
-          <div class="calc-label">Pendientes Auditoría</div>
+      <!-- Métricas Exclusivas de Seguridad e Higiene (Sin Metrajes ni Cúbicos) -->
+      <div class="header-kpis-grid" style="margin-bottom: 0.85rem;">
+        <div class="calc-box-compact" style="border-left: 3px solid #10b981;">
+          <div class="calc-val" style="color: #10b981;">${habilitadosSeguros}</div>
+          <div class="calc-label">Habilitados Seguros ✅</div>
         </div>
-        <div class="calc-box" style="padding: 0.5rem 0.8rem;">
-          <div class="calc-val" style="color: #10b981; font-size: 1.25rem;">${validados}</div>
-          <div class="calc-label">Validados ✅</div>
+        <div class="calc-box-compact" style="border-left: 3px solid ${deshabilitadosHSE > 0 ? '#ef4444' : '#64748b'}; background: ${deshabilitadosHSE > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(15, 23, 42, 0.7)'};">
+          <div class="calc-val" style="color: #ef4444;">${deshabilitadosHSE}</div>
+          <div class="calc-label" style="color: #fca5a5; font-weight: 800;">Deshabilitados HSE ⛔</div>
         </div>
-        <div class="calc-box" style="padding: 0.5rem 0.8rem;">
-          <div class="calc-val" style="color: #38bdf8; font-size: 1.25rem;">${rectificados}</div>
-          <div class="calc-label">Rectificados ✏️</div>
+        <div class="calc-box-compact" style="border-left: 3px solid #f59e0b;">
+          <div class="calc-val" style="color: #f59e0b;">${subsanacionesPendientes}</div>
+          <div class="calc-label">Subsanados a Revisar 🟡</div>
         </div>
-        <div class="calc-box" style="padding: 0.5rem 0.8rem;">
-          <div class="calc-val" style="color: #ef4444; font-size: 1.25rem;">${observados}</div>
-          <div class="calc-label">Observados ↩️</div>
+        <div class="calc-box-compact" style="border-left: 3px solid #38bdf8;">
+          <div class="calc-val" style="color: #38bdf8;">${total}</div>
+          <div class="calc-label">Total en Terreno 🛡️</div>
         </div>
       </div>
 
       ${computables.length === 0 ? `
-        <div style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
-          No existen andamios habilitados para auditar en este momento.
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          No se encontraron andamios activos en la planta para inspeccionar en este momento.
         </div>
       ` : `
         <div class="table-responsive">
-          <table id="tablaAuditoria">
+          <table id="tablaSeguridadHSE">
             <thead>
               <tr>
                 <th>N° Solicitud / Tarjeta</th>
-                <th>Ubicación Técnica</th>
-                <th>Empresa Contratista</th>
-                <th>Metraje Solicitado</th>
-                <th>Metraje Real Informado</th>
-                <th>Régimen</th>
-                <th>Estado Auditoría</th>
-                <th>Acciones de Control</th>
+                <th>Ubicación & Sector</th>
+                <th>Empresa Armadora</th>
+                <th>Estado de Seguridad</th>
+                <th>Hallazgos de Seguridad & Evidencia Fotográfica</th>
+                <th>Permanencia</th>
+                <th>Acciones HSE</th>
               </tr>
             </thead>
             <tbody>
               ${computables.map(s => {
-    const volSol = s.dimSolicitadaAndamio?.volumenM3 || 0;
-    const supSol = s.dimSolicitadaPlataforma?.superficieM2 || 0;
-    const volReal = s.totalVolumenRealM3 || volSol;
-    const supReal = s.totalSuperficieRealM2 || supSol;
-    const auditoria = s.estadoAuditoria || 'PENDIENTE_AUDITORIA';
+    const esDeshabilitado = s.estado === 'DESHABILITADO_HSE';
+    const evHSE = s.eventoSeguridadHSE;
+    const dias = s.diasPermanencia || 1;
+    const tieneSubsanacion = evHSE?.subsanacionContratista && !evHSE.subsanado;
 
-    let badgeHtml = '';
-    if (auditoria === 'VALIDADO') {
-      badgeHtml = `<span class="status-badge habilitado" title="Auditado por ${s.auditadoPor || 'Gestionador'}">✅ Validado</span>`;
-    } else if (auditoria === 'RECTIFICADO') {
-      badgeHtml = `<span class="status-badge programado" title="${s.rectificacionGestionador?.motivo || ''}">✏️ Rectificado</span>`;
-    } else if (auditoria === 'OBSERVADO') {
-      badgeHtml = `<span class="status-badge cancelado" title="${s.observacionesAuditoria?.detalle || ''}">↩️ Observado</span>`;
+    let badgeSeguridad = '';
+    if (esDeshabilitado) {
+      badgeSeguridad = `<span class="status-badge cancelado" style="background: #dc2626; color: #fff; font-weight: 800; animation: pulse 1.5s infinite;">⛔ DESHABILITADO (ROJA)</span>`;
+    } else if (tieneSubsanacion) {
+      badgeSeguridad = `<span class="status-badge" style="background: #f59e0b; color: #000; font-weight: 800;">🟡 CORRECCIÓN REPORTADA</span>`;
+    } else if (s.estado === 'HABILITADO') {
+      badgeSeguridad = `<span class="status-badge habilitado" style="background: #10b981; color: #fff;">🟢 HABILITADO (VERDE)</span>`;
+    } else if (s.estado === 'EN_ALQUILER') {
+      badgeSeguridad = `<span class="status-badge" style="background: #b45309; color: #fff;">🟡 EN ALQUILER (VERDE)</span>`;
     } else {
-      badgeHtml = `<span class="status-badge solicitado">⏳ Pendiente</span>`;
+      badgeSeguridad = `<span class="status-badge" style="background: #64748b; color: #fff;">⚪ ${s.estado}</span>`;
     }
 
     return `
-                  <tr>
-                    <td>
-                      <strong>${s.numeroCorrelativo}</strong><br>
-                      <small style="color: var(--arauco-accent);">${s.tarjetaId}</small>
-                    </td>
-                    <td>
-                      <strong>${s.ubicacionTecnica}</strong><br>
-                      <small style="color: var(--text-muted);">${s.sector} (${s.centroCostos})</small>
-                    </td>
-                    <td>
-                      <small><strong>${s.proveedorAsignado || 'Sin asignar'}</strong></small>
-                    </td>
-                    <td>
-                      <small style="color: var(--text-muted);">${volSol} m³ · ${supSol} m²</small>
-                    </td>
-                    <td>
-                      <strong style="color: #38bdf8;">${volReal} m³</strong> · 
-                      <strong style="color: #4ade80;">${supReal} m²</strong>
-                      ${s.rectificacionGestionador ? `<br><small style="color: #93c5fd;">(Ajustado de ${s.rectificacionGestionador.volumenAnteriorM3} m³)</small>` : ''}
-                    </td>
-                    <td>
-                      <small>${s.regimenHorarioReal || s.regimenHorarioEstimado || 'Hábiles'}</small>
-                    </td>
-                    <td>
-                      ${badgeHtml}
-                    </td>
-                    <td>
-                      <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                        <button class="btn btn-sm" style="background: #10b981; padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="auditarSolicitud('${s.id}', 'VALIDAR')" title="Aprobar medidas informadas para liquidación">
-                          ✅ Validar
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="abrirModalRectificar('${s.id}')" title="Modificar medidas reales tras medición de campo">
-                          ✏️ Rectificar
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="border-color: #ef4444; color: #ef4444; padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="abrirModalObservar('${s.id}')" title="Devolver con observaciones a la contratista">
-                          ↩️ Observar
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="imprimirTarjetaHabilitacionPorId('${s.id}')" title="Ver e imprimir tarjeta física con código QR">
-                          🏷️ QR
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="window.open('/verificar.html?id=' + encodeURIComponent('${s.numeroCorrelativo}'), '_blank')" title="Abrir ficha pública de auditoría en terreno">
-                          🌐 Ficha
-                        </button>
+                <tr class="${esDeshabilitado ? 'fila-deshabilitada' : ''}" style="${esDeshabilitado ? 'background: rgba(220, 38, 38, 0.08);' : ''}">
+                  <td>
+                    <strong>${s.numeroCorrelativo}</strong><br>
+                    <small style="color: ${esDeshabilitado ? '#ef4444' : 'var(--arauco-accent)'}; font-weight: 700;">${s.tarjetaId}</small>
+                  </td>
+                  <td>
+                    <strong>${s.ubicacionTecnica}</strong><br>
+                    <small style="color: var(--text-muted);">${s.sector} (${s.centroCostos})</small>
+                  </td>
+                  <td>
+                    <small><strong>${s.proveedorAsignado || 'Sin asignar'}</strong></small>
+                  </td>
+                  <td>
+                    ${badgeSeguridad}
+                  </td>
+                  <td>
+                    ${esDeshabilitado && evHSE ? `
+                      <div style="font-size: 0.8rem; line-height: 1.3;">
+                        <span style="color: #f87171; font-weight: 800;">⚠️ ${evHSE.motivoPrincipal || 'Condición Insegura'}</span>
+                        ${evHSE.itemsObservados && evHSE.itemsObservados.length > 0 ? `
+                          <div style="color: #fca5a5; font-size: 0.74rem; margin-top: 2px;">
+                            • ${evHSE.itemsObservados.slice(0, 2).join('<br>• ')}
+                            ${evHSE.itemsObservados.length > 2 ? `<br><small style="color: #94a3b8;">(+${evHSE.itemsObservados.length - 2} más...)</small>` : ''}
+                          </div>
+                        ` : ''}
+                        ${evHSE.fotoEvidencia ? `
+                          <div style="margin-top: 4px;">
+                            <button type="button" class="btn btn-sm btn-outline" style="border-color: #ef4444; color: #f87171; padding: 0.15rem 0.4rem; font-size: 0.72rem;" onclick="verFotoEvidencia('${evHSE.fotoEvidencia}', '${s.numeroCorrelativo}')">
+                              📷 Ver Evidencia Fotográfica
+                            </button>
+                          </div>
+                        ` : '<small style="color: #94a3b8;">(Sin foto adjunta)</small>'}
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 3px;">
+                          Inspector: ${evHSE.inspectorNombre || 'HSE'} · ${evHSE.fecha ? new Date(evHSE.fecha).toLocaleDateString() : ''}
+                        </div>
                       </div>
-                    </td>
-                  </tr>
-                `;
+                    ` : tieneSubsanacion ? `
+                      <div style="font-size: 0.8rem; color: #fef08a;">
+                        <strong>🔧 Corrección informada por contratista:</strong><br>
+                        <small style="color: #fde047;">${evHSE.subsanacionContratista.detalle || 'Subsanación realizada'}</small>
+                        ${evHSE.subsanacionContratista.foto ? `
+                          <div style="margin-top: 3px;">
+                            <button type="button" class="btn btn-sm btn-outline" style="border-color: #f59e0b; color: #fef08a; padding: 0.15rem 0.4rem; font-size: 0.72rem;" onclick="verFotoEvidencia('${evHSE.subsanacionContratista.foto}', '${s.numeroCorrelativo}')">
+                              📷 Foto de la Reparación
+                            </button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    ` : `
+                      <div style="font-size: 0.78rem; color: #86efac;">
+                        ✔ Estructura apta y conforme a normativa ARAUCO.<br>
+                        <small style="color: var(--text-muted);">${s.checklistHabilitacion ? 'Checklist 11 puntos firmado' : 'Habilitado en sitio'}</small>
+                        ${s.fotoAndamioMontado ? `
+                          <div style="margin-top: 3px;">
+                            <button type="button" class="btn btn-sm btn-outline" style="padding: 0.12rem 0.35rem; font-size: 0.7rem;" onclick="verFotoEvidencia('${s.fotoAndamioMontado}', '${s.numeroCorrelativo}')">
+                              📷 Foto Montaje
+                            </button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `}
+                  </td>
+                  <td>
+                    <span style="font-weight: 700; color: ${dias > 30 ? '#ef4444' : '#10b981'}; font-size: 0.82rem;">
+                      Día ${dias} de 30
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                      ${esDeshabilitado ? `
+                        <button class="btn btn-sm" style="background: #10b981; color: #fff; padding: 0.2rem 0.45rem; font-size: 0.75rem;" onclick="abrirModalRehabilitarHSE('${s.id}')" title="Aprobar corrección y re-habilitar andamio (Tarjeta Verde)">
+                          🟢 Re-Habilitar
+                        </button>
+                        <button class="btn btn-outline btn-sm" style="border-color: #f59e0b; color: #f59e0b; padding: 0.2rem 0.45rem; font-size: 0.75rem;" onclick="abrirModalSubsanarHSE('${s.id}')" title="Registrar modificaciones realizadas por contratista">
+                          🔧 Subsanar
+                        </button>
+                      ` : `
+                        <button class="btn btn-danger btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;" onclick="abrirModalDeshabilitarHSE('${s.id}')" title="Deshabilitar andamio por faltantes, componentes dañados o riesgo">
+                          🚫 Deshabilitar
+                        </button>
+                      `}
+                      <button class="btn btn-outline btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;" onclick="imprimirTarjetaHabilitacionPorId('${s.id}')" title="Ver e imprimir tarjeta oficial">
+                        🏷️ Tarjeta
+                      </button>
+                      <button class="btn btn-outline btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;" onclick="window.open('/verificar.html?id=' + encodeURIComponent('${s.numeroCorrelativo}'), '_blank')" title="Abrir ficha pública en terreno">
+                        🌐 Ficha
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
   }).join('')}
             </tbody>
           </table>
@@ -3177,184 +3244,497 @@ function renderAuditoriaGestionador(container) {
       `}
     </div>
 
-    <!-- Modal para Rectificar Medidas Reales -->
-    <div id="modalRectificar" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
-          <h3 id="rectificarTitulo" style="margin: 0; font-size: 1.1rem; color: #fff;">✏️ Rectificar Metraje de Andamio</h3>
-          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalRectificar()">✖</button>
+    <!-- ========================================================
+         MODAL 1: DESHABILITAR ANDAMIO POR SEGURIDAD (TARJETA ROJA)
+         ======================================================== -->
+    <div id="modalDeshabilitarHSE" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
+      <div style="background: var(--bg-card); border: 2px solid #ef4444; border-radius: 10px; max-width: 540px; width: 100%; padding: 1.25rem; box-shadow: 0 10px 40px rgba(239,68,68,0.3); max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #ef4444; padding-bottom: 0.5rem;">
+          <h3 id="deshabilitarTituloHSE" style="margin: 0; font-size: 1.1rem; color: #fca5a5; display: flex; align-items: center; gap: 0.5rem;">
+            🚫 Deshabilitar Andamio (Emisión Tarjeta Roja HSE)
+          </h3>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalDeshabilitarHSE()">✖</button>
         </div>
-        <form onsubmit="handleRectificarSubmit(event)">
-          <input type="hidden" id="rectificarSolId">
-          <div class="form-group" style="margin-bottom: 0.75rem;">
-            <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Nuevo Volumen Real de Andamio (m³)</label>
-            <input type="number" step="0.01" id="rectNuevoVolumen" required style="width: 100%; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;">
+
+        <form onsubmit="handleDeshabilitarHSESubmit(event)">
+          <input type="hidden" id="deshabilitarSolId">
+          <input type="hidden" id="hseFotoUrl">
+
+          <!-- Identificación del Andamio -->
+          <div id="deshabilitarInfoBox" style="background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.82rem; border-left: 3px solid #ef4444;">
           </div>
-          <div class="form-group" style="margin-bottom: 0.75rem;">
-            <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Nueva Superficie Real de Plataformas (m²)</label>
-            <input type="number" step="0.01" id="rectNuevaSuperficie" required style="width: 100%; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;">
-          </div>
-          <div class="form-group" style="margin-bottom: 0.75rem;">
-            <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Régimen Horario Real</label>
-            <select id="rectNuevoRegimen" style="width: 100%; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;">
-              <option value="HABILES">Días Hábiles (Normal)</option>
-              <option value="SABADO_NOCTURNO">Sábados y Horario Nocturno</option>
-              <option value="DOMINGO_FERIADO">Domingos y Feriados</option>
+
+          <!-- Motivo Principal -->
+          <div class="form-group" style="margin-bottom: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fca5a5;">Motivo Principal de Deshabilitación:</label>
+            <select id="hseMotivoPrincipal" required style="width: 100%; padding: 0.45rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.85rem;">
+              <option value="Faltante de protecciones colectivas (Rodapiés / Barandas / Trampillas)">Faltante de protecciones colectivas (Rodapiés / Barandas / Trampillas)</option>
+              <option value="Componentes estructurales en malas condiciones (Deformados / Fisurados / Corrosión)">Componentes en malas condiciones (Deformados / Fisurados / Corrosión)</option>
+              <option value="Armado deficiente (Desaplomado / Inestable / Riesgo de vuelco)">Armado deficiente (Desaplomado / Inestable / Riesgo de vuelco)</option>
+              <option value="Falta de apoyos reglamentarios (Bases / Tacos de madera repartidores)">Falta de apoyos reglamentarios (Bases / Tacos repartidores)</option>
+              <option value="Falta de arriostramiento o anclaje a estructura fija">Falta de arriostramiento o anclaje a estructura fija</option>
+              <option value="Plataforma de trabajo incompleta, rajada o con grasa/aceite">Plataforma de trabajo incompleta, rajada o con grasa/aceite</option>
+              <option value="Acceso inseguro (Falta escalera reglamentaria o trampa)">Acceso inseguro (Falta escalera reglamentaria o trampa)</option>
+              <option value="Modificación indebida realizada por personal no calificado">Modificación indebida realizada por personal no calificado</option>
+              <option value="Interferencia peligrosa (Líneas eléctricas / Tuberías de vapor)">Interferencia peligrosa (Líneas eléctricas / Tuberías de vapor)</option>
+              <option value="Otro riesgo de seguridad e higiene">Otro riesgo de seguridad e higiene</option>
             </select>
           </div>
-          <div class="form-group" style="margin-bottom: 1.25rem;">
-            <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Justificación / Motivo de la Rectificación Técnica</label>
-            <textarea id="rectMotivo" required placeholder="Ej: Medición de campo realizada determinó metraje rectificado..." style="width: 100%; height: 70px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;"></textarea>
+
+          <!-- Checklist Rápido de Deficiencias Observadas -->
+          <div class="form-group" style="margin-bottom: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fca5a5;">Deficiencias Críticas Observadas en Terreno (Selecciona las que apliquen):</label>
+            <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; max-height: 140px; overflow-y: auto; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Falta rodapié / guardapié reglamentario (mín. 15 cm de altura)"> Falta rodapié reglamentario (mín. 15 cm)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Falta baranda superior (a 1.00 m) o intermedia (a 0.50 m)"> Falta baranda superior (1 m) o intermedia (0.50 m)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Tablones o plataformas fisuradas, deformadas o con aceite/grasa"> Tablones fisurados, deformados o aceitados
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Estructura desaplomada o sin diagonales de arriostramiento"> Estructura desaplomada o sin diagonales
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Bases niveladoras falseadas, sueltas o sin pasadores de seguridad"> Bases niveladoras falseadas o sin pasador
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Apoyo sobre terreno blando sin durmientes repartidores de carga"> Apoyo sobre terreno sin durmientes de madera
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Escalera interior de acceso ausente, inaccesible o sin trampa"> Falta escalera interior reglamentaria
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                <input type="checkbox" class="chk-hse-deficiencia" value="Modificación no autorizada realizada en terreno por terceros"> Modificación no autorizada en terreno
+              </label>
+            </div>
           </div>
+
+          <!-- Detalle de la No Conformidad -->
+          <div class="form-group" style="margin-bottom: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fca5a5;">Descripción Detallada del Riesgo Hallado:</label>
+            <textarea id="hseDetalleObservacion" required rows="2" placeholder="Ej: Se observa faltante de rodapié en cara norte y plataforma nivel +4.5m con tablón suelto..." style="width: 100%; padding: 0.45rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.82rem;"></textarea>
+          </div>
+
+          <!-- REGISTRO FOTOGRÁFICO DE LA NO-CONFORMIDAD -->
+          <div class="form-group" style="margin-bottom: 0.75rem; background: rgba(0,0,0,0.25); border: 1px dashed #ef4444; border-radius: 6px; padding: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fca5a5; display: block; margin-bottom: 0.35rem;">
+              📷 Registro Fotográfico del Evento / Falla en Terreno:
+            </label>
+            <input type="file" id="hseFotoInputFile" accept="image/*" capture="environment" style="font-size: 0.8rem;" onchange="handleHSEFotoUpload(event)">
+            <div id="hseFotoPreviewBox" style="margin-top: 0.5rem; text-align: center; display: none;">
+              <img id="hseFotoImg" src="" alt="Foto Evidencia" style="max-width: 100%; max-height: 180px; border-radius: 6px; border: 1px solid #ef4444;">
+              <div style="font-size: 0.75rem; color: #10b981; margin-top: 3px;">✔ Fotografía adjunta correctamente</div>
+            </div>
+            <small style="color: var(--text-muted); font-size: 0.72rem; display: block; margin-top: 4px;">
+              Toma una fotografía directa o adjunta la imagen que evidencia la anomalía para la contratista.
+            </small>
+          </div>
+
+          <!-- Identificación del Inspector -->
+          <div class="form-group" style="margin-bottom: 0.85rem;">
+            <label style="font-size: 0.78rem; color: var(--text-muted);">Inspector de Seguridad HSE Actuante:</label>
+            <input type="text" id="hseInspectorNombre" readonly style="width: 100%; padding: 0.35rem 0.5rem; font-size: 0.8rem; background: rgba(0,0,0,0.2); color: #94a3b8; border: 1px solid var(--border); border-radius: 4px;">
+          </div>
+
           <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-            <button type="button" class="btn btn-outline" onclick="cerrarModalRectificar()">Cancelar</button>
-            <button type="submit" class="btn" style="background: var(--arauco-green-light);">Guardar Rectificación</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalDeshabilitarHSE()">Cancelar</button>
+            <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.4rem 0.8rem; font-weight: 700;">
+              🚫 Confirmar Deshabilitación (Emitir Tarjeta Roja)
+            </button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Modal para Observar Solicitud / Devolver -->
-    <div id="modalObservar" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; max-width: 450px; width: 100%; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
-          <h3 style="margin: 0; font-size: 1.1rem; color: #fca5a5;">↩️ Observar Andamio Habilitado</h3>
-          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalObservar()">✖</button>
+    <!-- ========================================================
+         MODAL 2: RE-HABILITAR ANDAMIO TRAS SUBSANACIÓN (TARJETA VERDE)
+         ======================================================== -->
+    <div id="modalRehabilitarHSE" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+      <div style="background: var(--bg-card); border: 2px solid #10b981; border-radius: 10px; max-width: 500px; width: 100%; padding: 1.25rem; box-shadow: 0 10px 40px rgba(16,185,129,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #10b981; padding-bottom: 0.5rem;">
+          <h3 id="rehabilitarTituloHSE" style="margin: 0; font-size: 1.1rem; color: #86efac; display: flex; align-items: center; gap: 0.5rem;">
+            🟢 Re-Habilitar Andamio (Restablecer Tarjeta Verde)
+          </h3>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalRehabilitarHSE()">✖</button>
         </div>
-        <form onsubmit="handleObservarSubmit(event)">
-          <input type="hidden" id="observarSolId">
-          <div class="form-group" style="margin-bottom: 1.25rem;">
-            <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Detalle de Observación / No Conformidad</label>
-            <textarea id="observarDetalle" required placeholder="Ej: Falta asegurar rodapié en plataforma nivel +6m o tarjeta ilegible..." style="width: 100%; height: 90px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;"></textarea>
+
+        <form onsubmit="handleRehabilitarHSESubmit(event)">
+          <input type="hidden" id="rehabilitarSolId">
+          <input type="hidden" id="hseRehabFotoUrl">
+
+          <div id="rehabilitarInfoBox" style="background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.82rem; border-left: 3px solid #10b981;">
           </div>
+
+          <div class="form-group" style="margin-bottom: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #86efac;">Conclusiones de la Re-Inspección en Terreno:</label>
+            <textarea id="hseObservacionesRehab" required rows="3" placeholder="Ej: Se constata la colocación de rodapié faltante y reemplazo de tablón. Estructura aplomada y apta para habilitación." style="width: 100%; padding: 0.45rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.82rem;"></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.75rem; background: rgba(0,0,0,0.25); border: 1px dashed #10b981; border-radius: 6px; padding: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #86efac; display: block; margin-bottom: 0.35rem;">
+              📷 Foto de Verificación de la Subsanación (Opcional):
+            </label>
+            <input type="file" id="hseRehabFotoInput" accept="image/*" capture="environment" style="font-size: 0.8rem;" onchange="handleHSERehabFotoUpload(event)">
+            <div id="hseRehabFotoPreviewBox" style="margin-top: 0.5rem; text-align: center; display: none;">
+              <img id="hseRehabFotoImg" src="" alt="Foto Verificación" style="max-width: 100%; max-height: 160px; border-radius: 6px; border: 1px solid #10b981;">
+            </div>
+          </div>
+
           <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-            <button type="button" class="btn btn-outline" onclick="cerrarModalObservar()">Cancelar</button>
-            <button type="submit" class="btn btn-danger">Confirmar Observación</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalRehabilitarHSE()">Cancelar</button>
+            <button type="submit" class="btn btn-sm" style="background: #10b981; color: #fff; padding: 0.4rem 0.8rem; font-weight: 700;">
+              🟢 Re-Habilitar Oficialmente (Tarjeta Verde)
+            </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         MODAL 3: REPORTAR SUBSANACIÓN (EMPRESA CONTRATISTA)
+         ======================================================== -->
+    <div id="modalSubsanarHSE" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+      <div style="background: var(--bg-card); border: 2px solid #f59e0b; border-radius: 10px; max-width: 500px; width: 100%; padding: 1.25rem; box-shadow: 0 10px 40px rgba(245,158,11,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f59e0b; padding-bottom: 0.5rem;">
+          <h3 id="subsanarTituloHSE" style="margin: 0; font-size: 1.1rem; color: #fde047; display: flex; align-items: center; gap: 0.5rem;">
+            🔧 Reportar Subsanación de Andamio (Contratista)
+          </h3>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalSubsanarHSE()">✖</button>
+        </div>
+
+        <form onsubmit="handleSubsanarHSESubmit(event)">
+          <input type="hidden" id="subsanarSolId">
+          <input type="hidden" id="hseSubsanarFotoUrl">
+
+          <div id="subsanarInfoBox" style="background: rgba(0,0,0,0.3); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.82rem; border-left: 3px solid #f59e0b;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fde047;">Detalle de Modificaciones y Reparaciones Realizadas:</label>
+            <textarea id="hseDetalleSubsanacion" required rows="3" placeholder="Ej: Se instalaron los rodapiés faltantes en la plataforma y se ajustaron las trabas de seguridad..." style="width: 100%; padding: 0.45rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.82rem;"></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.75rem; background: rgba(0,0,0,0.25); border: 1px dashed #f59e0b; border-radius: 6px; padding: 0.65rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #fde047; display: block; margin-bottom: 0.35rem;">
+              📷 Foto de la Modificación / Andamio Corregido:
+            </label>
+            <input type="file" id="hseSubsanarFotoInput" accept="image/*" capture="environment" style="font-size: 0.8rem;" onchange="handleHSESubsanarFotoUpload(event)">
+            <div id="hseSubsanarFotoPreviewBox" style="margin-top: 0.5rem; text-align: center; display: none;">
+              <img id="hseSubsanarFotoImg" src="" alt="Foto Subsanación" style="max-width: 100%; max-height: 160px; border-radius: 6px; border: 1px solid #f59e0b;">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalSubsanarHSE()">Cancelar</button>
+            <button type="submit" class="btn btn-sm" style="background: #f59e0b; color: #000; padding: 0.4rem 0.8rem; font-weight: 800;">
+              🔧 Enviar Reporte de Subsanación
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         MODAL 4: VISUALIZADOR DE EVIDENCIA FOTOGRÁFICA
+         ======================================================== -->
+    <div id="modalFotoHSE" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1100; align-items: center; justify-content: center; padding: 1rem;" onclick="cerrarModalFotoHSE()">
+      <div style="max-width: 700px; width: 100%; text-align: center;" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; color: #fff;">
+          <h4 id="modalFotoHSETitulo" style="margin: 0; font-size: 1rem;">📷 Registro Fotográfico HSE</h4>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalFotoHSE()">✖ Cerrar</button>
+        </div>
+        <img id="modalFotoHSEImg" src="" alt="Registro Fotográfico" style="max-width: 100%; max-height: 75vh; border-radius: 8px; border: 2px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
       </div>
     </div>
   `;
 }
 
-window.filtrarTablaAuditoria = () => {
-  const query = document.getElementById('filtroAuditoria')?.value.toLowerCase() || '';
-  const filas = document.querySelectorAll('#tablaAuditoria tbody tr');
+/* ========================================================
+   HANDLERS Y FUNCIONES OPERATIVAS DE SEGURIDAD E HIGIENE
+   ======================================================== */
+
+window.filtrarTablaSeguridadHSE = () => {
+  const estadoFiltro = document.getElementById('filtroEstadoHSE')?.value || 'TODOS';
+  const query = (document.getElementById('filtroSeguridadInput')?.value || '').toLowerCase().trim();
+  const filas = document.querySelectorAll('#tablaSeguridadHSE tbody tr');
+
   filas.forEach(f => {
-    f.style.display = f.textContent.toLowerCase().includes(query) ? '' : 'none';
+    const texto = f.textContent.toLowerCase();
+    const coincideTexto = !query || texto.includes(query);
+
+    let coincideEstado = true;
+    if (estadoFiltro === 'DESHABILITADOS') {
+      coincideEstado = f.classList.contains('fila-deshabilitada') || texto.includes('deshabilitado');
+    } else if (estadoFiltro === 'SUBSANADOS') {
+      coincideEstado = texto.includes('corrección reportada');
+    } else if (estadoFiltro === 'HABILITADOS') {
+      coincideEstado = texto.includes('habilitado') && !f.classList.contains('fila-deshabilitada');
+    }
+
+    f.style.display = (coincideTexto && coincideEstado) ? '' : 'none';
   });
 };
 
-window.auditarSolicitud = async (solicitudId, accion) => {
+window.verFotoEvidencia = (url, correlativo) => {
+  const modal = document.getElementById('modalFotoHSE');
+  const img = document.getElementById('modalFotoHSEImg');
+  const tit = document.getElementById('modalFotoHSETitulo');
+  if (!modal || !img) return;
+
+  img.src = url;
+  if (tit) tit.textContent = `📷 Registro Fotográfico - Andamio N° ${correlativo || ''}`;
+  modal.style.display = 'flex';
+};
+
+window.cerrarModalFotoHSE = () => {
+  const modal = document.getElementById('modalFotoHSE');
+  if (modal) modal.style.display = 'none';
+};
+
+// Subida de foto en modal de Deshabilitación
+window.handleHSEFotoUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const previewBox = document.getElementById('hseFotoPreviewBox');
+  const img = document.getElementById('hseFotoImg');
+  const inputUrl = document.getElementById('hseFotoUrl');
+
+  const formData = new FormData();
+  formData.append('foto', file);
+
   try {
-    const res = await fetch(`/api/gestionador/auditar-solicitud/${solicitudId}`, {
+    const res = await fetch('/api/upload', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accion,
-        gestionadorNombre: AppState.currentUser?.nombre || 'Ing. Marcelo Rossi'
-      })
+      body: formData
     }).then(r => r.json());
 
     if (res.ok) {
-      alert(`✅ Andamio ${res.solicitud.numeroCorrelativo} marcado como VALIDADO exitosamente.`);
-      await renderPortalGestionador(document.getElementById('appContainer'), AppState.currentUser);
+      if (inputUrl) inputUrl.value = res.url;
+      if (img) img.src = res.url;
+      if (previewBox) previewBox.style.display = 'block';
     } else {
-      alert('Error: ' + res.error);
+      alert('Error al subir imagen: ' + res.error);
     }
   } catch (err) {
-    alert('Fallo de conexión al auditar');
+    alert('Fallo de conexión al subir la fotografía.');
   }
 };
 
-window.abrirModalRectificar = (solicitudId) => {
-  const sol = AppState.todasSolicitudesGestionador.find(s => s.id === solicitudId);
+window.abrirModalDeshabilitarHSE = (solicitudId) => {
+  const sol = (AppState.todasSolicitudesGestionador || []).find(s => s.id === solicitudId);
   if (!sol) return;
 
-  document.getElementById('rectificarSolId').value = sol.id;
-  document.getElementById('rectificarTitulo').textContent = `✏️ Rectificar Medidas: ${sol.numeroCorrelativo}`;
-  document.getElementById('rectNuevoVolumen').value = sol.totalVolumenRealM3 || sol.dimSolicitadaAndamio?.volumenM3 || 0;
-  document.getElementById('rectNuevaSuperficie').value = sol.totalSuperficieRealM2 || sol.dimSolicitadaPlataforma?.superficieM2 || 0;
-  document.getElementById('rectNuevoRegimen').value = sol.regimenHorarioReal || 'HABILES';
-  document.getElementById('rectMotivo').value = '';
-  document.getElementById('modalRectificar').style.display = 'flex';
+  document.getElementById('deshabilitarSolId').value = sol.id;
+  document.getElementById('deshabilitarTituloHSE').textContent = `🚫 Deshabilitar Andamio N° ${sol.numeroCorrelativo}`;
+  document.getElementById('deshabilitarInfoBox').innerHTML = `
+    <strong>Andamio:</strong> ${sol.numeroCorrelativo} | <strong>Tarjeta:</strong> ${sol.tarjetaId}<br>
+    <strong>Ubicación:</strong> ${sol.ubicacionTecnica} (${sol.sector}) | <strong>Contratista:</strong> ${sol.proveedorAsignado || 'N/A'}
+  `;
+  document.getElementById('hseFotoUrl').value = '';
+  document.getElementById('hseDetalleObservacion').value = '';
+  document.getElementById('hseFotoPreviewBox').style.display = 'none';
+  document.getElementById('hseFotoInputFile').value = '';
+
+  const chks = document.querySelectorAll('.chk-hse-deficiencia');
+  chks.forEach(c => c.checked = false);
+
+  const inspectorInput = document.getElementById('hseInspectorNombre');
+  if (inspectorInput) inspectorInput.value = `${AppState.currentUser?.nombre || 'Lic. Roberto Varela'} (Seguridad HSE ARAUCO)`;
+
+  document.getElementById('modalDeshabilitarHSE').style.display = 'flex';
 };
 
-window.cerrarModalRectificar = () => {
-  const modal = document.getElementById('modalRectificar');
+window.cerrarModalDeshabilitarHSE = () => {
+  const modal = document.getElementById('modalDeshabilitarHSE');
   if (modal) modal.style.display = 'none';
 };
 
-window.handleRectificarSubmit = async (e) => {
+window.handleDeshabilitarHSESubmit = async (e) => {
   e.preventDefault();
-  const solId = document.getElementById('rectificarSolId').value;
-  const nuevoVolumenM3 = document.getElementById('rectNuevoVolumen').value;
-  const nuevaSuperficieM2 = document.getElementById('rectNuevaSuperficie').value;
-  const nuevoRegimen = document.getElementById('rectNuevoRegimen').value;
-  const motivoRectificacion = document.getElementById('rectMotivo').value;
+  const solId = document.getElementById('deshabilitarSolId').value;
+  const motivo = document.getElementById('hseMotivoPrincipal').value;
+  const observaciones = document.getElementById('hseDetalleObservacion').value;
+  const fotoEvidencia = document.getElementById('hseFotoUrl').value;
+  const inspectorNombre = document.getElementById('hseInspectorNombre').value;
+
+  const chks = document.querySelectorAll('.chk-hse-deficiencia:checked');
+  const itemsObservados = Array.from(chks).map(c => c.value);
 
   try {
-    const res = await fetch(`/api/gestionador/auditar-solicitud/${solId}`, {
+    const res = await fetch(`/api/seguridad/deshabilitar/${solId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accion: 'RECTIFICAR',
-        gestionadorNombre: AppState.currentUser?.nombre || 'Ing. Marcelo Rossi',
-        nuevoVolumenM3,
-        nuevaSuperficieM2,
-        nuevoRegimen,
-        motivoRectificacion
+        motivo,
+        itemsObservados,
+        observaciones,
+        fotoEvidencia,
+        inspectorNombre
       })
     }).then(r => r.json());
 
     if (res.ok) {
-      alert(`✅ Metraje rectificado correctamente para ${res.solicitud.numeroCorrelativo}.\nNuevo volumen: ${nuevoVolumenM3} m³\nNueva superficie: ${nuevaSuperficieM2} m²`);
-      cerrarModalRectificar();
+      alert(`⛔ ANDAMIO ${res.solicitud.numeroCorrelativo} DESHABILITADO EXITOSAMENTE.\n\nSe emitió la Tarjeta Roja de Seguridad y se registró la fotografía del evento en la base central.`);
+      cerrarModalDeshabilitarHSE();
       await renderPortalGestionador(document.getElementById('appContainer'), AppState.currentUser);
     } else {
       alert('Error: ' + res.error);
     }
   } catch (err) {
-    alert('Fallo al guardar rectificación');
+    alert('Fallo de conexión al deshabilitar el andamio.');
   }
 };
 
-window.abrirModalObservar = (solicitudId) => {
-  document.getElementById('observarSolId').value = solicitudId;
-  document.getElementById('observarDetalle').value = '';
-  document.getElementById('modalObservar').style.display = 'flex';
+// Modal de Re-Habilitación
+window.abrirModalRehabilitarHSE = (solicitudId) => {
+  const sol = (AppState.todasSolicitudesGestionador || []).find(s => s.id === solicitudId);
+  if (!sol) return;
+
+  document.getElementById('rehabilitarSolId').value = sol.id;
+  document.getElementById('rehabilitarTituloHSE').textContent = `🟢 Re-Habilitar Andamio N° ${sol.numeroCorrelativo}`;
+
+  const ev = sol.eventoSeguridadHSE;
+  document.getElementById('rehabilitarInfoBox').innerHTML = `
+    <strong>Andamio:</strong> ${sol.numeroCorrelativo} | <strong>Tarjeta:</strong> ${sol.tarjetaId}<br>
+    <strong>Ubicación:</strong> ${sol.ubicacionTecnica} (${sol.sector})<br>
+    ${ev ? `<div style="margin-top: 4px; color: #fca5a5;"><strong>Motivo previo de bloqueo:</strong> ${ev.motivoPrincipal || ''}</div>` : ''}
+    ${ev?.subsanacionContratista ? `<div style="margin-top: 4px; color: #fef08a;"><strong>Subsanación informada:</strong> ${ev.subsanacionContratista.detalle}</div>` : ''}
+  `;
+  document.getElementById('hseObservacionesRehab').value = '';
+  document.getElementById('hseRehabFotoUrl').value = '';
+  document.getElementById('hseRehabFotoPreviewBox').style.display = 'none';
+
+  document.getElementById('modalRehabilitarHSE').style.display = 'flex';
 };
 
-window.cerrarModalObservar = () => {
-  const modal = document.getElementById('modalObservar');
+window.cerrarModalRehabilitarHSE = () => {
+  const modal = document.getElementById('modalRehabilitarHSE');
   if (modal) modal.style.display = 'none';
 };
 
-window.handleObservarSubmit = async (e) => {
-  e.preventDefault();
-  const solId = document.getElementById('observarSolId').value;
-  const observacionesAuditoria = document.getElementById('observarDetalle').value;
+window.handleHSERehabFotoUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('foto', file);
 
   try {
-    const res = await fetch(`/api/gestionador/auditar-solicitud/${solId}`, {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
+    if (res.ok) {
+      document.getElementById('hseRehabFotoUrl').value = res.url;
+      document.getElementById('hseRehabFotoImg').src = res.url;
+      document.getElementById('hseRehabFotoPreviewBox').style.display = 'block';
+    }
+  } catch (err) {
+    alert('Error al subir foto de verificación');
+  }
+};
+
+window.handleRehabilitarHSESubmit = async (e) => {
+  e.preventDefault();
+  const solId = document.getElementById('rehabilitarSolId').value;
+  const observacionesRehabilitacion = document.getElementById('hseObservacionesRehab').value;
+  const fotoVerificacion = document.getElementById('hseRehabFotoUrl').value;
+
+  try {
+    const res = await fetch(`/api/seguridad/rehabilitar/${solId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accion: 'OBSERVAR',
-        gestionadorNombre: AppState.currentUser?.nombre || 'Ing. Marcelo Rossi',
-        observacionesAuditoria
+        inspectorNombre: AppState.currentUser?.nombre || 'Lic. Roberto Varela',
+        observacionesRehabilitacion,
+        fotoVerificacion
       })
     }).then(r => r.json());
 
     if (res.ok) {
-      alert(`↩️ Andamio ${res.solicitud.numeroCorrelativo} marcado como OBSERVADO.`);
-      cerrarModalObservar();
+      alert(`🟢 ANDAMIO ${res.solicitud.numeroCorrelativo} RE-HABILITADO EXITOSAMENTE.\n\nSe restableció la Tarjeta Verde de Seguridad.`);
+      cerrarModalRehabilitarHSE();
       await renderPortalGestionador(document.getElementById('appContainer'), AppState.currentUser);
     } else {
       alert('Error: ' + res.error);
     }
   } catch (err) {
-    alert('Fallo al registrar observación');
+    alert('Fallo de conexión al re-habilitar');
+  }
+};
+
+// Modal de Subsanación (Contratista)
+window.abrirModalSubsanarHSE = (solicitudId) => {
+  const sol = (AppState.todasSolicitudesGestionador || []).find(s => s.id === solicitudId) ||
+    (AppState.ordenesEjecutante || []).find(s => s.id === solicitudId);
+  if (!sol) return;
+
+  document.getElementById('subsanarSolId').value = sol.id;
+  document.getElementById('subsanarTituloHSE').textContent = `🔧 Subsanar Andamio N° ${sol.numeroCorrelativo}`;
+
+  const ev = sol.eventoSeguridadHSE;
+  document.getElementById('subsanarInfoBox').innerHTML = `
+    <strong>Andamio:</strong> ${sol.numeroCorrelativo} | <strong>Ubicación:</strong> ${sol.ubicacionTecnica}<br>
+    ${ev ? `<div style="color: #fca5a5; margin-top: 3px;"><strong>No-conformidad a reparar:</strong> ${ev.motivoPrincipal}<br>${ev.observaciones || ''}</div>` : ''}
+  `;
+  document.getElementById('hseDetalleSubsanacion').value = '';
+  document.getElementById('hseSubsanarFotoUrl').value = '';
+  document.getElementById('hseSubsanarFotoPreviewBox').style.display = 'none';
+
+  document.getElementById('modalSubsanarHSE').style.display = 'flex';
+};
+
+window.cerrarModalSubsanarHSE = () => {
+  const modal = document.getElementById('modalSubsanarHSE');
+  if (modal) modal.style.display = 'none';
+};
+
+window.handleHSESubsanarFotoUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('foto', file);
+
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
+    if (res.ok) {
+      document.getElementById('hseSubsanarFotoUrl').value = res.url;
+      document.getElementById('hseSubsanarFotoImg').src = res.url;
+      document.getElementById('hseSubsanarFotoPreviewBox').style.display = 'block';
+    }
+  } catch (err) {
+    alert('Error al subir foto de subsanación');
+  }
+};
+
+window.handleSubsanarHSESubmit = async (e) => {
+  e.preventDefault();
+  const solId = document.getElementById('subsanarSolId').value;
+  const detalleSubsanacion = document.getElementById('hseDetalleSubsanacion').value;
+  const fotoSubsanacion = document.getElementById('hseSubsanarFotoUrl').value;
+
+  try {
+    const res = await fetch(`/api/seguridad/subsanar/${solId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        responsableNombre: AppState.currentUser?.nombre || 'Contratista',
+        detalleSubsanacion,
+        fotoSubsanacion
+      })
+    }).then(r => r.json());
+
+    if (res.ok) {
+      alert(`🔧 REPORTE DE SUBSANACIÓN CARGADO EXITOSAMENTE.\n\nEl andamio ${res.solicitud.numeroCorrelativo} queda a la espera de verificación por Seguridad HSE para su re-habilitación.`);
+      cerrarModalSubsanarHSE();
+      await renderPortalGestionador(document.getElementById('appContainer'), AppState.currentUser);
+    } else {
+      alert('Error: ' + res.error);
+    }
+  } catch (err) {
+    alert('Fallo al enviar reporte de subsanación');
   }
 };
 
@@ -4260,6 +4640,13 @@ function imprimirTarjetaHabilitacion(sol) {
   const sup = sol.totalSuperficieRealM2 || sol.dimSolicitadaPlataforma?.superficieM2 || 0;
   const verifyUrl = `${window.location.origin}/verificar.html?id=${encodeURIComponent(sol.numeroCorrelativo)}`;
 
+  const esDeshabilitadoHSE = sol.estado === 'DESHABILITADO_HSE';
+  const colorBorde = esDeshabilitadoHSE ? '#dc2626' : '#15803d';
+  const headerBg = esDeshabilitadoHSE ? '#dc2626' : '#15803d';
+  const tituloHeader = esDeshabilitadoHSE ? '⛔ TARJETA ROJA — ANDAMIO NO HABILITADO' : 'TARJETA DE HABILITACIÓN DE ANDAMIO';
+  const estadoHeader = esDeshabilitadoHSE ? 'ESTADO: DESHABILITADO POR SEGURIDAD — PROHIBIDO SUBIR' : 'Estado: COMPLETO Y EN CONDICIONES SEGURAS';
+  const colorTarjetaId = esDeshabilitadoHSE ? '#dc2626' : '#15803d';
+
   let qrSvg = '';
   if (typeof window.generateQRCodeSVG === 'function') {
     qrSvg = window.generateQRCodeSVG(verifyUrl, 150);
@@ -4269,15 +4656,21 @@ function imprimirTarjetaHabilitacion(sol) {
 
   area.style.display = 'block';
   area.innerHTML = `
-    <div class="tarjeta-imprimible">
-      <div class="tarjeta-header">
+    <div class="tarjeta-imprimible" style="border: 4px solid ${colorBorde};">
+      <div class="tarjeta-header" style="background-color: ${headerBg};">
         <h2>ARAUCO PLANTA INDUSTRIAL</h2>
-        <div style="font-weight: 800; font-size: 1rem; letter-spacing: 0.5px;">TARJETA DE HABILITACIÓN DE ANDAMIO</div>
-        <div style="font-size: 0.75rem; text-transform: uppercase;">Estado: COMPLETO Y EN CONDICIONES SEGURAS</div>
+        <div style="font-weight: 800; font-size: 1rem; letter-spacing: 0.5px;">${tituloHeader}</div>
+        <div style="font-size: 0.75rem; text-transform: uppercase;">${estadoHeader}</div>
       </div>
 
+      ${esDeshabilitadoHSE ? `
+        <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 4px; padding: 0.4rem; margin: 0.4rem 0; color: #991b1b; text-align: center; font-size: 0.8rem; font-weight: 800;">
+          ⚠️ PELIGRO: ANDAMIO CLAUSURADO POR HSE. FALTANTE DE COMPONENTES O ARMADO DEFICIENTE. PROHIBIDO SU USO HASTA SU RE-HABILITACIÓN.
+        </div>
+      ` : ''}
+
       <div style="text-align: center; margin-bottom: 0.5rem;">
-        <span style="font-size: 1.6rem; font-weight: 900; color: #15803d; letter-spacing: 1px;">
+        <span style="font-size: 1.6rem; font-weight: 900; color: ${colorTarjetaId}; letter-spacing: 1px;">
           ${sol.tarjetaId}
         </span><br>
         <span style="font-size: 0.9rem; font-weight: 700; color: #334155;">
@@ -4293,7 +4686,7 @@ function imprimirTarjetaHabilitacion(sol) {
           CÓDIGO QR DE TRAZABILIDAD OFICIAL
         </div>
         <div style="font-size: 0.72rem; color: #64748b;">
-          Escanea para auditar fotos, checklist y fecha límite de 30 días
+          Escanea para auditar fotos, checklist y estado de seguridad
         </div>
         <div style="font-size: 0.65rem; color: #0284c7; word-break: break-all; margin-top: 2px;">
           ${verifyUrl}
@@ -4312,16 +4705,14 @@ function imprimirTarjetaHabilitacion(sol) {
         <span>Empresa de Montaje:</span>
         <strong>${sol.proveedorAsignado || 'Contratista Externa'}</strong>
       </div>
+      ${esDeshabilitadoHSE && sol.eventoSeguridadHSE ? `
+        <div class="tarjeta-data-row" style="color: #b91c1c;">
+          <span>Motivo Bloqueo HSE:</span>
+          <strong>${sol.eventoSeguridadHSE.motivoPrincipal || 'Condición Insegura'}</strong>
+        </div>
+      ` : ''}
       <div class="tarjeta-data-row">
-        <span>Volumen Real Montado:</span>
-        <strong style="color: #0284c7;">${vol} m³</strong>
-      </div>
-      <div class="tarjeta-data-row">
-        <span>Superficie Plataforma:</span>
-        <strong style="color: #16a34a;">${sup} m²</strong>
-      </div>
-      <div class="tarjeta-data-row">
-        <span>Fecha de Habilitación:</span>
+        <span>Fecha de Habilitación / Estado:</span>
         <strong>${sol.fechaArmado ? sol.fechaArmado.split('T')[0] : new Date().toISOString().split('T')[0]}</strong>
       </div>
       <div class="tarjeta-data-row">
@@ -4335,8 +4726,8 @@ function imprimirTarjetaHabilitacion(sol) {
           <div style="color: #64748b; border-top: 1px dotted #000; margin-top: 25px;">Firma Supervisor Andamista</div>
         </div>
         <div style="width: 48%;">
-          <div style="font-weight: 700;">Ing. Marcelo Rossi</div>
-          <div style="color: #64748b; border-top: 1px dotted #000; margin-top: 25px;">Firma Supervisor ARAUCO</div>
+          <div style="font-weight: 700;">${esDeshabilitadoHSE ? (sol.eventoSeguridadHSE?.inspectorNombre || 'Seguridad HSE') : (AppState.currentUser?.nombre || 'Ing. Marcelo Rossi')}</div>
+          <div style="color: #64748b; border-top: 1px dotted #000; margin-top: 25px;">${esDeshabilitadoHSE ? 'Inspector HSE ARAUCO' : 'Firma Supervisor ARAUCO'}</div>
         </div>
       </div>
     </div>

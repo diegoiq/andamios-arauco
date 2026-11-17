@@ -1137,6 +1137,123 @@ app.post('/api/solicitudes/:id/solicitar-reforma', (req, res) => {
   res.json({ ok: true, solicitud: sol, reforma: nuevaReforma });
 });
 
+/* ========================================================
+   SEGURIDAD E HIGIENE (HSE) — AUDITORÍA Y CONTROL EN PLANTA
+   ======================================================== */
+
+// Deshabilitar andamio por condición insegura / emisión de Tarjeta Roja HSE
+app.post('/api/seguridad/deshabilitar/:id', (req, res) => {
+  const { id } = req.params;
+  const { motivo, itemsObservados, observaciones, fotoEvidencia, inspectorNombre } = req.body;
+  const db = getDb();
+  const sol = db.solicitudes.find(s => s.id === id);
+
+  if (!sol) return res.status(404).json({ ok: false, error: 'Andamio no encontrado' });
+
+  // Guardar estado previo para la re-habilitación
+  if (sol.estado !== 'DESHABILITADO_HSE') {
+    sol.estadoAnteriorHSE = sol.estado;
+  }
+  sol.estado = 'DESHABILITADO_HSE';
+  sol.estadoAuditoria = 'DESHABILITADO_HSE';
+  sol.fechaDeshabilitacionHSE = new Date().toISOString();
+
+  sol.eventoSeguridadHSE = {
+    motivoPrincipal: motivo || 'No-conformidad crítica de seguridad en terreno',
+    itemsObservados: Array.isArray(itemsObservados) ? itemsObservados : [],
+    observaciones: observaciones || '',
+    fotoEvidencia: fotoEvidencia || null,
+    inspectorNombre: inspectorNombre || 'Inspector HSE ARAUCO',
+    fecha: new Date().toISOString(),
+    subsanado: false
+  };
+
+  if (!sol.historialSeguridad) sol.historialSeguridad = [];
+  sol.historialSeguridad.unshift({
+    id: `HSE-${Date.now()}`,
+    tipo: 'DESHABILITACION_TARJETA_ROJA',
+    motivo: motivo || 'Condición Insegura en Terreno',
+    items: itemsObservados || [],
+    detalle: observaciones || '',
+    foto: fotoEvidencia || null,
+    inspector: inspectorNombre || 'Inspector HSE ARAUCO',
+    fecha: new Date().toISOString()
+  });
+
+  saveDb(db);
+  res.json({ ok: true, solicitud: sol, mensaje: `Andamio ${sol.numeroCorrelativo} deshabilitado por Seguridad e Higiene.` });
+});
+
+// Re-habilitar andamio tras subsanación y verificación oficial HSE (Tarjeta Verde)
+app.post('/api/seguridad/rehabilitar/:id', (req, res) => {
+  const { id } = req.params;
+  const { inspectorNombre, observacionesRehabilitacion, fotoVerificacion } = req.body;
+  const db = getDb();
+  const sol = db.solicitudes.find(s => s.id === id);
+
+  if (!sol) return res.status(404).json({ ok: false, error: 'Andamio no encontrado' });
+
+  sol.estado = sol.estadoAnteriorHSE || 'HABILITADO';
+  sol.estadoAuditoria = 'VALIDADO_HSE';
+  sol.fechaRehabilitacionHSE = new Date().toISOString();
+
+  if (sol.eventoSeguridadHSE) {
+    sol.eventoSeguridadHSE.subsanado = true;
+    sol.eventoSeguridadHSE.fechaRehabilitacion = new Date().toISOString();
+    sol.eventoSeguridadHSE.rehabilitadoPor = inspectorNombre || 'Inspector HSE ARAUCO';
+    sol.eventoSeguridadHSE.observacionesRehabilitacion = observacionesRehabilitacion || 'Condiciones de seguridad subsanadas conforme a normativa ARAUCO';
+    if (fotoVerificacion) sol.eventoSeguridadHSE.fotoVerificacion = fotoVerificacion;
+  }
+
+  if (!sol.historialSeguridad) sol.historialSeguridad = [];
+  sol.historialSeguridad.unshift({
+    id: `HSE-REHAB-${Date.now()}`,
+    tipo: 'REHABILITACION_TARJETA_VERDE',
+    detalle: observacionesRehabilitacion || 'Estructura verificada y re-habilitada para uso',
+    foto: fotoVerificacion || null,
+    inspector: inspectorNombre || 'Inspector HSE ARAUCO',
+    fecha: new Date().toISOString()
+  });
+
+  saveDb(db);
+  res.json({ ok: true, solicitud: sol, mensaje: `Andamio ${sol.numeroCorrelativo} re-habilitado con éxito.` });
+});
+
+// Registrar reporte de subsanación por la empresa contratista
+app.post('/api/seguridad/subsanar/:id', (req, res) => {
+  const { id } = req.params;
+  const { responsableNombre, detalleSubsanacion, fotoSubsanacion } = req.body;
+  const db = getDb();
+  const sol = db.solicitudes.find(s => s.id === id);
+
+  if (!sol) return res.status(404).json({ ok: false, error: 'Andamio no encontrado' });
+
+  if (!sol.eventoSeguridadHSE) {
+    sol.eventoSeguridadHSE = {};
+  }
+
+  sol.eventoSeguridadHSE.subsanacionContratista = {
+    responsable: responsableNombre || 'Supervisor Contratista',
+    detalle: detalleSubsanacion || 'Modificaciones y correcciones realizadas en terreno',
+    foto: fotoSubsanacion || null,
+    fecha: new Date().toISOString()
+  };
+  sol.estadoAuditoria = 'SUBSANACION_REPORTADA';
+
+  if (!sol.historialSeguridad) sol.historialSeguridad = [];
+  sol.historialSeguridad.unshift({
+    id: `HSE-SUB-${Date.now()}`,
+    tipo: 'REPORTE_SUBSANACION',
+    detalle: detalleSubsanacion,
+    foto: fotoSubsanacion,
+    responsable: responsableNombre || 'Contratista',
+    fecha: new Date().toISOString()
+  });
+
+  saveDb(db);
+  res.json({ ok: true, solicitud: sol, mensaje: 'Reporte de subsanación cargado. Pendiente de verificación HSE.' });
+});
+
 app.listen(PORT, async () => {
   console.log(`====================================================`);
   console.log(`  ANDAMIOS ARAUCO - Servidor PWA en ejecución`);
