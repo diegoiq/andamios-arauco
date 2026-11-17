@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId } from './db.js';
+import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1137,9 +1137,10 @@ app.post('/api/solicitudes/:id/solicitar-reforma', (req, res) => {
   res.json({ ok: true, solicitud: sol, reforma: nuevaReforma });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`====================================================`);
   console.log(`  ANDAMIOS ARAUCO - Servidor PWA en ejecución`);
   console.log(`  URL local: http://localhost:${PORT}`);
   console.log(`====================================================`);
+  await cargarDesdeSupabaseSiExiste();
 });

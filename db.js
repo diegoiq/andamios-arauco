@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,20 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// Configuración de Cliente Supabase (Híbrido)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+export const supabase = (SUPABASE_URL && SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+
+if (supabase) {
+  console.log('⚡ Conexión activa con Supabase PostgreSQL:', SUPABASE_URL);
+} else {
+  console.log('📁 Modo Base de Datos Local activa (data/db.json). Para conectar con Supabase configure SUPABASE_URL y SUPABASE_KEY.');
+}
 
 // Tarifario base oficial para validación financiera
 const TARIFARIOS_BASE = {
@@ -282,7 +297,122 @@ export function getDb() {
 }
 
 export function saveDb(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error escribiendo en db.json local:', err);
+  }
+
+  // Sincronizar en la nube si Supabase está conectado
+  if (supabase) {
+    persistirEnSupabase(data).catch(err => {
+      console.error('⚠️ Error al sincronizar cambios en Supabase:', err.message);
+    });
+  }
+}
+
+async function persistirEnSupabase(data) {
+  if (!supabase) return;
+
+  // 1. Usuarios
+  if (data.usuarios && data.usuarios.length > 0) {
+    const rowsUsuarios = data.usuarios.map(u => ({
+      id: u.id,
+      nombre: u.nombre,
+      email: u.email,
+      password: u.password,
+      rol: u.rol,
+      perfil_tipo: u.perfilTipo || null,
+      sector: u.sector || null,
+      legajo: u.legajo || null,
+      centro_costos: u.centroCostos || null,
+      empresa_nombre: u.empresaNombre || null,
+      recuperacion: u.recuperacion || null
+    }));
+    await supabase.from('usuarios').upsert(rowsUsuarios, { onConflict: 'id' });
+  }
+
+  // 2. Solicitudes y Parque de Andamios
+  if (data.solicitudes && data.solicitudes.length > 0) {
+    const rowsSol = data.solicitudes.map(s => ({
+      id: s.id,
+      numero_correlativo: s.numeroCorrelativo,
+      tarjeta_id: s.tarjetaId,
+      tipo_operacion: s.tipoOperacion || 'ANUAL',
+      estado: s.estado || 'SOLICITADO',
+      sector_solicitante: s.sectorSolicitante || null,
+      solicitante_id: s.solicitanteId || null,
+      solicitante_nombre: s.solicitanteNombre || null,
+      legajo: s.legajo || null,
+      sector: s.sector || null,
+      centro_costos: s.centroCostos || null,
+      ubicacion_tecnica: s.ubicacionTecnica || null,
+      proveedor_asignado: s.proveedorAsignado || null,
+      fecha_programada: s.fechaProgramada || null,
+      prioridad: s.prioridad || 'NORMAL',
+      total_volumen_real_m3: s.totalVolumenRealM3 || 0,
+      total_superficie_real_m2: s.totalSuperficieRealM2 || 0,
+      payload: s
+    }));
+    await supabase.from('solicitudes').upsert(rowsSol, { onConflict: 'id' });
+  }
+
+  // 3. Tarifarios y Correlativo
+  if (data.tarifarios) {
+    await supabase.from('configuracion').upsert({ clave: 'tarifarios', valor: data.tarifarios }, { onConflict: 'clave' });
+  }
+  if (data.correlativo) {
+    await supabase.from('configuracion').upsert({ clave: 'correlativo', valor: { ultimo: data.correlativo } }, { onConflict: 'clave' });
+  }
+}
+
+export async function cargarDesdeSupabaseSiExiste() {
+  if (!supabase) return;
+  try {
+    console.log('🔄 Sincronizando datos desde Supabase...');
+    const { data: users, error: errU } = await supabase.from('usuarios').select('*');
+    const { data: sols, error: errS } = await supabase.from('solicitudes').select('*');
+    const { data: configs } = await supabase.from('configuracion').select('*');
+    const { data: emps } = await supabase.from('empresas_servicio').select('*');
+
+    if (errU || errS) {
+      console.warn('⚠️ Tablas aún no inicializadas en Supabase (ejecute supabase_schema.sql en el SQL Editor).');
+      return;
+    }
+
+    const db = getDb();
+    if (users && users.length > 0) {
+      db.usuarios = users.map(u => ({
+        id: u.id,
+        nombre: u.nombre,
+        email: u.email,
+        password: u.password,
+        rol: u.rol,
+        perfilTipo: u.perfil_tipo,
+        sector: u.sector,
+        legajo: u.legajo,
+        centroCostos: u.centro_costos,
+        empresaNombre: u.empresa_nombre,
+        recuperacion: u.recuperacion
+      }));
+    }
+    if (sols && sols.length > 0) {
+      db.solicitudes = sols.map(s => s.payload || s);
+    }
+    if (configs && configs.length > 0) {
+      const t = configs.find(c => c.clave === 'tarifarios');
+      if (t && t.valor) db.tarifarios = t.valor;
+      const corr = configs.find(c => c.clave === 'correlativo');
+      if (corr && corr.valor?.ultimo) db.correlativo = corr.valor.ultimo;
+    }
+    if (emps && emps.length > 0) {
+      db.empresasServicio = emps;
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    console.log('✅ Base de datos local sincronizada con éxito desde Supabase.');
+  } catch (err) {
+    console.error('⚠️ Error al cargar desde Supabase:', err.message);
+  }
 }
 
 export function getNextNumeroCorrelativo() {
