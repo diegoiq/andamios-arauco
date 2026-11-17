@@ -1075,29 +1075,29 @@ async function renderPortalSolicitante(container, user) {
   };
 
   container.innerHTML = `
-    <div class="info-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div class="info-card dashboard-hero">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
         <div>
-          <h2>👤 Portal del Solicitante</h2>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">
+          <h2 style="margin: 0; font-size: 1.2rem;">👤 Portal del Solicitante</h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
             Usuario: <strong>${user.nombre}</strong> | Sector: <strong>${user.sector || 'Planta'}</strong> | Legajo: <strong>${user.legajo || 'N/A'}</strong> | CC: <strong>${user.centroCostos || 'N/A'}</strong>
           </p>
         </div>
-        <div class="grid-4" style="gap: 0.75rem;">
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="font-size: 1.2rem;">${met.totalPedidos}</div>
+        <div class="dashboard-header-kpis">
+          <div class="calc-box-compact">
+            <div class="calc-val" style="font-size: 1.15rem;">${met.totalPedidos}</div>
             <div class="calc-label">Total Pedidos</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="font-size: 1.2rem; color: #38bdf8;">${met.totalM3Solicitado} m³</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="font-size: 1.15rem; color: #38bdf8;">${met.totalM3Solicitado} m³</div>
             <div class="calc-label">Volumen Solicitado</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="font-size: 1.2rem; color: #4ade80;">${met.totalM2Solicitado} m²</div>
-            <div class="calc-label">Plataformas Solicitadas</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="font-size: 1.15rem; color: #4ade80;">${met.totalM2Solicitado} m²</div>
+            <div class="calc-label">Plat. Solicitadas</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="font-size: 1.2rem; color: #f59e0b;">${met.paraDesarme}</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="font-size: 1.15rem; color: #f59e0b;">${met.paraDesarme}</div>
             <div class="calc-label">Para Desarme</div>
           </div>
         </div>
@@ -1799,29 +1799,29 @@ async function renderPortalGestionador(container, user) {
   };
 
   container.innerHTML = `
-    <div class="info-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div class="info-card dashboard-hero">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
         <div>
-          <h2>🛡️ Centro de Control del Gestionador (Admin ARAUCO)</h2>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">
+          <h2 style="margin: 0; font-size: 1.2rem;">🛡️ Centro de Control del Gestionador (Admin ARAUCO)</h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
             Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación
           </p>
         </div>
-        <div class="grid-4" style="gap: 0.75rem;">
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #3b82f6; font-size: 1.2rem;">${m.solicitados}</div>
+        <div class="dashboard-header-kpis">
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #3b82f6; font-size: 1.15rem;">${m.solicitados}</div>
             <div class="calc-label">Nuevos Pedidos</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #10b981; font-size: 1.2rem;">${m.activosPlanta}</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${m.activosPlanta}</div>
             <div class="calc-label">Activos en Planta</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #ef4444; font-size: 1.2rem;">${m.enAlquiler}</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${m.enAlquiler}</div>
             <div class="calc-label">En Alquiler (>30d)</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #f59e0b; font-size: 1.2rem;">${m.desarmesPendientes}</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${m.desarmesPendientes}</div>
             <div class="calc-label">Desarmes Pendientes</div>
           </div>
         </div>
@@ -2043,47 +2043,47 @@ function renderVistaSemanalGestionador(container) {
 
   container.innerHTML = `
     <!-- Barra Superior de Navegación de Semanas Operativas -->
-    <div class="info-card" style="margin-bottom: 1rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+    <div class="info-card" style="margin-bottom: 0.65rem; padding: 0.6rem 0.85rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
         <div>
-          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-            <h2 style="margin: 0; font-size: 1.25rem; color: #fff;">📅 Vista Semanal Operativa (Miércoles a Martes)</h2>
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">📅 Vista Semanal Operativa (Miércoles a Martes)</h3>
             ${badgeEstadoSemana}
           </div>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
             Ciclo Oficial ARAUCO: <strong>${rangoTexto}</strong> · Programación, Control de Metraje & Vencimientos
           </p>
         </div>
 
         <!-- Controles de Navegación Temporal -->
-        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(-1)" title="Ir a la semana operativa anterior">
-            ◀ Semana Anterior
+        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+          <button class="btn btn-outline btn-sm" onclick="navegarSemana(-1)" title="Ir a la semana operativa anterior" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+            ◀ Anterior
           </button>
-          <button class="btn btn-sm ${AppState.semanaOffset === 0 ? 'btn-outline' : ''}" style="${AppState.semanaOffset === 0 ? 'border-color: #10b981; color: #10b981;' : 'background: #10b981; color: #fff;'}" onclick="irSemanaActual()" title="Regresar a la semana actual">
-            🔄 Semana Actual
+          <button class="btn btn-sm ${AppState.semanaOffset === 0 ? 'btn-outline' : ''}" style="${AppState.semanaOffset === 0 ? 'border-color: #10b981; color: #10b981;' : 'background: #10b981; color: #fff;'} padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="irSemanaActual()" title="Regresar a la semana actual">
+            🔄 Actual
           </button>
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(1)" title="Ir a la próxima semana operativa">
-            Semana Siguiente ▶
+          <button class="btn btn-outline btn-sm" onclick="navegarSemana(1)" title="Ir a la próxima semana operativa" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+            Siguiente ▶
           </button>
-          <button class="btn btn-outline btn-sm" onclick="window.print()" style="margin-left: 0.4rem;" title="Imprimir programa semanal">
+          <button class="btn btn-outline btn-sm" onclick="window.print()" style="margin-left: 0.2rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="Imprimir programa semanal">
             🖨️ Imprimir
           </button>
         </div>
       </div>
 
       <!-- Filtros Rápidos de la Semana -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.6rem;">
-        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Empresa:</label>
-          <select id="filtroEmpresaSemanal" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: #fff; border-radius: 4px;" onchange="cambiarFiltroEmpresaSemanal(this.value)">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin: 0;">Empresa:</label>
+          <select id="filtroEmpresaSemanal" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: auto;" onchange="cambiarFiltroEmpresaSemanal(this.value)">
             <option value="TODAS" ${AppState.filtroEmpresaSemanal === 'TODAS' ? 'selected' : ''}>Todas las Empresas</option>
             <option value="Andamios del Sur S.A." ${AppState.filtroEmpresaSemanal === 'Andamios del Sur S.A.' ? 'selected' : ''}>Andamios del Sur S.A.</option>
             <option value="Montajes Industriales S.A." ${AppState.filtroEmpresaSemanal === 'Montajes Industriales S.A.' ? 'selected' : ''}>Montajes Industriales S.A.</option>
           </select>
 
-          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-left: 0.4rem;">Evento:</label>
-          <select id="filtroEventoSemanal" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: #fff; border-radius: 4px;" onchange="cambiarFiltroEventoSemanal(this.value)">
+          <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin: 0 0 0 0.3rem;">Evento:</label>
+          <select id="filtroEventoSemanal" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: auto;" onchange="cambiarFiltroEventoSemanal(this.value)">
             <option value="TODOS" ${AppState.filtroEventoSemanal === 'TODOS' ? 'selected' : ''}>Todos los Eventos</option>
             <option value="PROGRAMADO" ${AppState.filtroEventoSemanal === 'PROGRAMADO' ? 'selected' : ''}>🔵 Montajes Programados</option>
             <option value="HABILITADO" ${AppState.filtroEventoSemanal === 'HABILITADO' ? 'selected' : ''}>🟢 Habilitados en Sitio</option>
@@ -2092,49 +2092,49 @@ function renderVistaSemanalGestionador(container) {
           </select>
         </div>
 
-        <div style="display: flex; gap: 0.4rem; align-items: center;">
-          <input type="text" id="busquedaSemanalInput" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal}" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: #fff; border-radius: 4px; width: 220px;" oninput="handleBusquedaSemanalInput(this.value)">
-          ${AppState.busquedaSemanal ? `<button class="btn btn-outline btn-sm" onclick="limpiarBusquedaSemanal()">✖</button>` : ''}
+        <div style="display: flex; gap: 0.35rem; align-items: center;">
+          <input type="text" id="busquedaSemanalInput" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal}" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: 200px;" oninput="handleBusquedaSemanalInput(this.value)">
+          ${AppState.busquedaSemanal ? `<button class="btn btn-outline btn-sm" onclick="limpiarBusquedaSemanal()" style="padding: 0.2rem 0.4rem;">✖</button>` : ''}
         </div>
       </div>
     </div>
 
     <!-- KPIs Rápidos de la Semana Operativa -->
-    <div class="grid-4" style="gap: 0.75rem; margin-bottom: 1rem;">
-      <div class="calc-box" style="padding: 0.6rem 0.85rem;">
-        <div class="calc-val" style="color: #38bdf8; font-size: 1.35rem;">${totalEventosSemana}</div>
-        <div class="calc-label">Movimientos Programados</div>
-        <small style="font-size: 0.7rem; color: var(--text-muted);">En los 7 días del ciclo</small>
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
+        <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${totalEventosSemana}</div>
+        <div class="calc-label">Movimientos Ciclo</div>
+        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">7 días operativos</small>
       </div>
 
-      <div class="calc-box" style="padding: 0.6rem 0.85rem;">
-        <div class="calc-val" style="color: #10b981; font-size: 1.35rem;">${andamiosActivosSemana.length}</div>
-        <div class="calc-label">Andamios en Planta</div>
-        <small style="font-size: 0.7rem; color: #4ade80;">${m3TotalActivoSemana.toFixed(1)} m³ · ${m2TotalActivoSemana.toFixed(1)} m²</small>
+      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
+        <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${andamiosActivosSemana.length}</div>
+        <div class="calc-label">Activos en Planta</div>
+        <small style="font-size: 0.65rem; color: #4ade80; display: block;">${m3TotalActivoSemana.toFixed(1)} m³ · ${m2TotalActivoSemana.toFixed(1)} m²</small>
       </div>
 
-      <div class="calc-box" style="padding: 0.6rem 0.85rem;">
-        <div class="calc-val" style="color: #f59e0b; font-size: 1.35rem;">${andamiosEnAlquilerSemana.length}</div>
+      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
+        <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${andamiosEnAlquilerSemana.length}</div>
         <div class="calc-label">En Alquiler (>30d)</div>
-        <small style="font-size: 0.7rem; color: var(--text-muted);">Costo por permanencia excedida</small>
+        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">Permanencia excedida</small>
       </div>
 
-      <div class="calc-box" style="padding: 0.6rem 0.85rem;">
-        <div class="calc-val" style="color: #ef4444; font-size: 1.35rem;">${desarmesSemana.length}</div>
+      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
+        <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${desarmesSemana.length}</div>
         <div class="calc-label">Desarmes en Proceso</div>
-        <small style="font-size: 0.7rem; color: var(--text-muted);">Liberación de materiales</small>
+        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">Liberación de material</small>
       </div>
     </div>
 
     <!-- Selector de Sub-pestañas Semanales -->
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; flex-wrap: wrap;">
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'tablero' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('tablero')" style="${AppState.subTabSemanal === 'tablero' ? 'background: #0284c7; color: #fff;' : ''}">
-        📅 1. Tablero Diario (7 Días: Miércoles a Martes)
+    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.65rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; flex-wrap: wrap;">
+      <button class="btn btn-sm ${AppState.subTabSemanal === 'tablero' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('tablero')" style="${AppState.subTabSemanal === 'tablero' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
+        📅 1. Tablero Diario (7 Días)
       </button>
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'activos' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('activos')" style="${AppState.subTabSemanal === 'activos' ? 'background: #0284c7; color: #fff;' : ''}">
+      <button class="btn btn-sm ${AppState.subTabSemanal === 'activos' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('activos')" style="${AppState.subTabSemanal === 'activos' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
         🏗️ 2. Parque Activo en la Semana (${andamiosActivosSemana.length})
       </button>
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'contratistas' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('contratistas')" style="${AppState.subTabSemanal === 'contratistas' ? 'background: #0284c7; color: #fff;' : ''}">
+      <button class="btn btn-sm ${AppState.subTabSemanal === 'contratistas' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('contratistas')" style="${AppState.subTabSemanal === 'contratistas' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
         📊 3. Resumen Consolidado por Contratista
       </button>
     </div>
@@ -3425,29 +3425,29 @@ async function renderPortalEjecutante(container, user) {
   };
 
   container.innerHTML = `
-    <div class="info-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div class="info-card dashboard-hero">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
         <div>
-          <h2>👷 Portal de Empresa Ejecutora / Contratista</h2>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">
+          <h2 style="margin: 0; font-size: 1.2rem;">👷 Portal de Empresa Ejecutora / Contratista</h2>
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
             Empresa Asignada: <strong>${user.empresaNombre || 'Contratista Externa'}</strong> | Supervisor: <strong>${user.nombre}</strong>
           </p>
         </div>
-        <div class="grid-4" style="gap: 0.75rem;">
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #38bdf8; font-size: 1.2rem;">${m.pendientesArmar}</div>
+        <div class="dashboard-header-kpis">
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${m.pendientesArmar}</div>
             <div class="calc-label">Para Armar</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #10b981; font-size: 1.2rem;">${m.activos}</div>
-            <div class="calc-label">Activos / Habilitados</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${m.activos}</div>
+            <div class="calc-label">Activos / Hab.</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #f59e0b; font-size: 1.2rem;">${m.pendientesDesarmar}</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${m.pendientesDesarmar}</div>
             <div class="calc-label">Para Desarmar</div>
           </div>
-          <div class="calc-box" style="padding: 0.4rem 0.8rem;">
-            <div class="calc-val" style="color: #a855f7; font-size: 1.2rem;">${m.m3Ejecutados} m³</div>
+          <div class="calc-box-compact">
+            <div class="calc-val" style="color: #a855f7; font-size: 1.15rem;">${m.m3Ejecutados} m³</div>
             <div class="calc-label">Metraje Ejecutado</div>
           </div>
         </div>
