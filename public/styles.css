@@ -601,3 +601,161 @@ footer {
   color: var(--text-muted);
   border-top: 1px solid var(--border);
 }
+
+/* ========================================================
+   BUSCADOR DE ANDAMIOS Y ESCÁNER QR
+   ======================================================== */
+.btn-scanner-header {
+  font-size: 0.82rem;
+  padding: 0.38rem 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #0f172a;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+  transition: all 0.2s ease;
+}
+.btn-scanner-header:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  filter: brightness(1.08);
+}
+@media (max-width: 640px) {
+  .btn-scanner-text {
+    display: none;
+  }
+}
+
+.qr-scanner-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.qr-tabs-nav {
+  display: flex;
+  background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid var(--border);
+}
+.qr-tab-btn {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+.qr-tab-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+.qr-tab-btn.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.qr-viewfinder-wrapper {
+  position: relative;
+  background: #020617;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-scan-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  height: 220px;
+  border: 2px solid rgba(56, 189, 248, 0.4);
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+.qr-scan-reticle::before,
+.qr-scan-reticle::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #38bdf8;
+  border-style: solid;
+}
+.qr-scan-reticle::before {
+  top: -2px;
+  left: -2px;
+  border-width: 4px 0 0 4px;
+  border-top-left-radius: 10px;
+}
+.qr-scan-reticle::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 4px 4px 0;
+  border-bottom-right-radius: 10px;
+}
+
+.qr-laser-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #10b981, #38bdf8, transparent);
+  box-shadow: 0 0 8px #38bdf8;
+  animation: qrLaserMove 2s infinite ease-in-out;
+  z-index: 11;
+}
+
+@keyframes qrLaserMove {
+  0% { top: 5%; opacity: 0.2; }
+  50% { top: 95%; opacity: 1; }
+  100% { top: 5%; opacity: 0.2; }
+}
+
+.search-result-card {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.search-result-card:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: #38bdf8;
+  transform: translateX(3px);
+}

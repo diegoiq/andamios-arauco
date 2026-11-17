@@ -3077,13 +3077,16 @@ function renderAuditoriaGestionador(container) {
           </p>
         </div>
         <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-warning" onclick="abrirBuscadorEscaneoQR('camara')" style="padding: 0.3rem 0.65rem; font-size: 0.8rem; font-weight: 700; background: #e0a96d; color: #1a202c; border: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+            📷 Escanear QR
+          </button>
           <select id="filtroEstadoHSE" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; width: auto; background: var(--bg-input); color: #fff; border: 1px solid var(--border); border-radius: 4px;" onchange="filtrarTablaSeguridadHSE()">
             <option value="TODOS">Todos los Andamios</option>
             <option value="DESHABILITADOS" ${deshabilitadosHSE > 0 ? 'selected' : ''}>🔴 Deshabilitados HSE (${deshabilitadosHSE})</option>
             <option value="SUBSANADOS">🟡 Subsanación Enviada (${subsanacionesPendientes})</option>
             <option value="HABILITADOS">🟢 Habilitados Seguros (${habilitadosSeguros})</option>
           </select>
-          <input type="text" id="filtroSeguridadInput" placeholder="🔍 Buscar N°, tarjeta, ubicación, contratista..." style="padding: 0.3rem 0.6rem; font-size: 0.8rem; width: 230px;" oninput="filtrarTablaSeguridadHSE()">
+          <input type="text" id="filtroSeguridadInput" placeholder="🔍 Buscar N°, tarjeta, ubicación, contratista..." style="padding: 0.3rem 0.6rem; font-size: 0.8rem; width: 220px;" oninput="filtrarTablaSeguridadHSE()">
         </div>
       </div>
 
@@ -5055,3 +5058,623 @@ window.imprimirPlanillaDirecta = (solicitudId) => {
     area.style.display = 'none';
   }, 250);
 };
+
+/* ========================================================
+   MÓDULO DE BÚSQUEDA RÁPIDA Y ESCÁNER QR DE ANDAMIOS ARAUCO
+   ======================================================== */
+let html5QrCodeScannerInstance = null;
+let camarasDisponibles = [];
+let camaraActualId = null;
+
+function emitirBeepExito() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  } catch (e) {}
+}
+
+function extraerCorrelativoDeQR(qrString) {
+  if (!qrString) return '';
+  qrString = qrString.trim();
+  // Intento 1: Parámetro URL ?id=AND-2026-0001
+  const matchUrl = qrString.match(/[?&]id=([^&#]+)/i);
+  if (matchUrl && matchUrl[1]) {
+    return decodeURIComponent(matchUrl[1]);
+  }
+  // Intento 2: Patrón ARAUCO AND-YYYY-XXXX
+  const matchAnd = qrString.match(/(AND[-\s_]?\d{4}[-\s_]?\d+)/i);
+  if (matchAnd && matchAnd[1]) {
+    return matchAnd[1].toUpperCase().replace(/\s/g, '-');
+  }
+  // Intento 3: Sufijo de ruta /verificar/ID o /solicitudes/ID
+  const matchPath = qrString.match(/\/(AND[^\/\s?#]+)$/i);
+  if (matchPath && matchPath[1]) {
+    return matchPath[1];
+  }
+  return qrString;
+}
+
+window.abrirBuscadorEscaneoQR = function(tabInicial = 'camara') {
+  let modal = document.getElementById('modalBuscadorQR');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalBuscadorQR';
+    modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2500; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="qr-scanner-card">
+      <!-- Encabezado del Modal -->
+      <div style="padding: 1rem 1.25rem; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.3rem;">📷</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.05rem; color: #fff;">Buscador & Escáner de Andamios ARAUCO</h3>
+            <p style="margin: 0.15rem 0 0 0; font-size: 0.75rem; color: var(--text-muted);">
+              Escanee la tarjeta QR en terreno o busque por N° correlativo, tag de equipo o contratista.
+            </p>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="cerrarModalBuscadorQR()" style="padding: 0.25rem 0.6rem; font-size: 1rem; line-height: 1;">✕</button>
+      </div>
+
+      <!-- Selector de Pestañas / Modos -->
+      <div class="qr-tabs-nav" id="qrTabsNav">
+        <button class="qr-tab-btn" id="btnTabCamaraQR" onclick="cambiarTabBuscadorQR('camara')">
+          <span>📷</span> Cámara en Vivo
+        </button>
+        <button class="qr-tab-btn" id="btnTabTextoQR" onclick="cambiarTabBuscadorQR('texto')">
+          <span>🔍</span> Buscar por Texto
+        </button>
+        <button class="qr-tab-btn" id="btnTabArchivoQR" onclick="cambiarTabBuscadorQR('archivo')">
+          <span>📁</span> Subir Foto QR
+        </button>
+      </div>
+
+      <!-- Contenedor Principal de Vistas -->
+      <div style="padding: 1rem; overflow-y: auto; max-height: calc(90vh - 120px);">
+        
+        <!-- Pestaña 1: Cámara en Vivo -->
+        <div id="qrPanelCamara" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="font-size: 0.8rem; color: #94a3b8;">
+              Apunte la cámara a la <strong>Tarjeta Física de Habilitación</strong> del andamio.
+            </span>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <select id="selectCamarasQR" style="display: none; padding: 0.2rem 0.4rem; font-size: 0.75rem; background: var(--bg-input); color: #fff; border: 1px solid var(--border); border-radius: 4px;" onchange="cambiarCamaraQR(this.value)">
+              </select>
+              <button class="btn btn-outline btn-sm" id="btnIniciarCamaraQR" onclick="iniciarEscanerCamaraQR()" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+                ▶️ Activar Cámara
+              </button>
+              <button class="btn btn-outline btn-sm" id="btnDetenerCamaraQR" onclick="detenerEscanerCamaraQR()" style="display: none; padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #ef4444; border-color: #ef4444;">
+                ⏹️ Detener
+              </button>
+            </div>
+          </div>
+
+          <div class="qr-viewfinder-wrapper" id="qrViewfinderWrapper">
+            <div id="qrReaderView" style="width: 100%; min-height: 280px;"></div>
+            <div class="qr-scan-reticle" id="qrScanReticle">
+              <div class="qr-laser-line"></div>
+            </div>
+          </div>
+
+          <div id="qrScanningIndicator" style="display: none; text-align: center; margin-top: 0.6rem; font-size: 0.8rem; color: #38bdf8;">
+            <span class="spinner" style="display: inline-block; width: 14px; height: 14px; margin-right: 0.4rem; vertical-align: middle;"></span>
+            Escaneando código QR en tiempo real...
+          </div>
+
+          <div id="qrErrorCamara"></div>
+        </div>
+
+        <!-- Pestaña 2: Búsqueda Rápida por Texto -->
+        <div id="qrPanelTexto" style="display: none;">
+          <div style="margin-bottom: 0.8rem;">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input type="text" id="inputBuscarAndamioTexto" placeholder="🔍 Escriba N° Correlativo (AND-...), Solicitante, Tag o Área..." style="flex: 1; padding: 0.5rem 0.8rem; font-size: 0.9rem;" oninput="buscarAndamiosEnVivo(this.value)">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('inputBuscarAndamioTexto').value=''; buscarAndamiosEnVivo('');" style="padding: 0.5rem 0.75rem;">Limpiar</button>
+            </div>
+            
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Filtrar por:</span>
+              <select id="filtroRapidoEstadoQR" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; background: var(--bg-input); color: #fff; border: 1px solid var(--border); border-radius: 4px;" onchange="buscarAndamiosEnVivo(document.getElementById('inputBuscarAndamioTexto').value)">
+                <option value="TODOS">Todos los Estados</option>
+                <option value="HABILITADOS">🟢 Habilitados Seguros</option>
+                <option value="DESHABILITADOS">🔴 Deshabilitados HSE</option>
+                <option value="ALQUILER">🟡 En Alquiler (>30d)</option>
+                <option value="DESARME">🟠 En Desarme</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="listaResultadosBusqueda" style="max-height: 380px; overflow-y: auto;">
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+              Cargando catálogo de andamios...
+            </div>
+          </div>
+        </div>
+
+        <!-- Pestaña 3: Subir Foto de Tarjeta -->
+        <div id="qrPanelArchivo" style="display: none; text-align: center; padding: 2rem 1rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">📷</div>
+          <h4 style="margin: 0 0 0.5rem 0; color: #fff;">Escanear desde Foto o Archivo</h4>
+          <p style="color: var(--text-muted); font-size: 0.85rem; max-width: 420px; margin: 0 auto 1.5rem auto;">
+            Si la cámara en vivo no está disponible o tiene una foto ya tomada de la tarjeta física, puede cargarla aquí para decodificar su QR al instante.
+          </p>
+          <input type="file" id="inputFileFotoQR" accept="image/*" capture="environment" style="display: none;" onchange="procesarFotoArchivoQR(this)">
+          <button class="btn btn-warning" onclick="document.getElementById('inputFileFotoQR').click()" style="padding: 0.6rem 1.5rem; font-size: 0.95rem; font-weight: 700; background: #e0a96d; color: #1a202c;">
+            📸 Tomar Foto o Elegir Imagen
+          </button>
+          <div id="qrReaderViewHidden" style="display: none;"></div>
+        </div>
+
+        <!-- Ficha Técnica & de Seguridad del Andamio (Resultado) -->
+        <div id="qrPanelFichaResultado" style="display: none;">
+          <!-- Se inyecta dinámicamente -->
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+  cambiarTabBuscadorQR(tabInicial);
+};
+
+window.cerrarModalBuscadorQR = function() {
+  detenerEscanerCamaraQR();
+  const modal = document.getElementById('modalBuscadorQR');
+  if (modal) modal.style.display = 'none';
+};
+
+window.cambiarTabBuscadorQR = function(modo) {
+  const tabs = ['camara', 'texto', 'archivo'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`btnTab${t.charAt(0).toUpperCase() + t.slice(1)}QR`);
+    const panel = document.getElementById(`qrPanel${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (btn) btn.classList.remove('active');
+    if (panel) panel.style.display = 'none';
+  });
+
+  const ficha = document.getElementById('qrPanelFichaResultado');
+  if (ficha) ficha.style.display = 'none';
+
+  const nav = document.getElementById('qrTabsNav');
+  if (nav) nav.style.display = 'flex';
+
+  if (modo === 'camara') {
+    document.getElementById('btnTabCamaraQR')?.classList.add('active');
+    const p = document.getElementById('qrPanelCamara');
+    if (p) p.style.display = 'block';
+    setTimeout(iniciarEscanerCamaraQR, 100);
+  } else if (modo === 'texto') {
+    detenerEscanerCamaraQR();
+    document.getElementById('btnTabTextoQR')?.classList.add('active');
+    const p = document.getElementById('qrPanelTexto');
+    if (p) p.style.display = 'block';
+    const input = document.getElementById('inputBuscarAndamioTexto');
+    if (input) {
+      input.focus();
+      buscarAndamiosEnVivo(input.value);
+    }
+  } else if (modo === 'archivo') {
+    detenerEscanerCamaraQR();
+    document.getElementById('btnTabArchivoQR')?.classList.add('active');
+    const p = document.getElementById('qrPanelArchivo');
+    if (p) p.style.display = 'block';
+  }
+};
+
+window.iniciarEscanerCamaraQR = async function() {
+  const container = document.getElementById('qrReaderView');
+  if (!container) return;
+
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('qrErrorCamara').innerHTML = `
+      <div style="background: rgba(239,68,68,0.15); border: 1px solid #ef4444; color: #fca5a5; padding: 0.6rem; border-radius: 6px; font-size: 0.8rem; margin-top: 0.5rem; text-align: center;">
+        ⚠️ La librería del escáner no pudo iniciarse en este navegador. Utilice la pestaña <strong>Buscar por Texto</strong>.
+      </div>
+    `;
+    return;
+  }
+
+  try {
+    if (html5QrCodeScannerInstance) {
+      try {
+        await html5QrCodeScannerInstance.stop();
+      } catch (e) {}
+      html5QrCodeScannerInstance = null;
+    }
+
+    html5QrCodeScannerInstance = new Html5Qrcode("qrReaderView");
+
+    // Enumerar cámaras disponibles
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      camarasDisponibles = devices || [];
+      const camSelect = document.getElementById('selectCamarasQR');
+      if (camSelect && camarasDisponibles.length > 1) {
+        camSelect.innerHTML = camarasDisponibles.map(d => `<option value="${d.id}" ${d.id === camaraActualId ? 'selected' : ''}>📷 ${d.label || 'Cámara ' + d.id.slice(0, 6)}</option>`).join('');
+        camSelect.style.display = 'inline-block';
+      }
+    } catch (e) {}
+
+    const config = {
+      fps: 15,
+      qrbox: (w, h) => {
+        const edge = Math.floor(Math.min(w, h) * 0.72);
+        return { width: edge, height: edge };
+      },
+      aspectRatio: 1.0
+    };
+
+    const qrSuccessCallback = async (decodedText) => {
+      emitirBeepExito();
+      try {
+        await html5QrCodeScannerInstance.stop();
+      } catch (e) {}
+      html5QrCodeScannerInstance = null;
+
+      const codigo = extraerCorrelativoDeQR(decodedText);
+      await cargarFichaAndamioModal(codigo);
+    };
+
+    const camConfig = camaraActualId ? { deviceId: { exact: camaraActualId } } : { facingMode: "environment" };
+
+    await html5QrCodeScannerInstance.start(
+      camConfig,
+      config,
+      qrSuccessCallback,
+      () => {} // Ignorar frames sin código
+    );
+
+    document.getElementById('qrScanningIndicator').style.display = 'block';
+    document.getElementById('btnIniciarCamaraQR').style.display = 'none';
+    document.getElementById('btnDetenerCamaraQR').style.display = 'inline-block';
+    document.getElementById('qrErrorCamara').innerHTML = '';
+  } catch (err) {
+    console.warn('Cámara QR no pudo iniciarse:', err);
+    document.getElementById('qrScanningIndicator').style.display = 'none';
+    document.getElementById('btnIniciarCamaraQR').style.display = 'inline-block';
+    document.getElementById('btnDetenerCamaraQR').style.display = 'none';
+    document.getElementById('qrErrorCamara').innerHTML = `
+      <div style="background: rgba(239,68,68,0.15); border: 1px solid #ef4444; color: #fca5a5; padding: 0.6rem; border-radius: 6px; font-size: 0.8rem; margin-top: 0.5rem; text-align: center;">
+        ⚠️ No se pudo acceder a la cámara en vivo (${err?.name || 'Permiso denegado o no disponible'}).<br>
+        Puede <strong>subir una foto de la tarjeta</strong> o usar el <strong>buscador por texto</strong>.
+      </div>
+    `;
+  }
+};
+
+window.cambiarCamaraQR = async function(deviceId) {
+  camaraActualId = deviceId;
+  await iniciarEscanerCamaraQR();
+};
+
+window.detenerEscanerCamaraQR = async function() {
+  if (html5QrCodeScannerInstance) {
+    try {
+      await html5QrCodeScannerInstance.stop();
+    } catch (e) {}
+    html5QrCodeScannerInstance = null;
+  }
+  const ind = document.getElementById('qrScanningIndicator');
+  if (ind) ind.style.display = 'none';
+  const btnStart = document.getElementById('btnIniciarCamaraQR');
+  if (btnStart) btnStart.style.display = 'inline-block';
+  const btnStop = document.getElementById('btnDetenerCamaraQR');
+  if (btnStop) btnStop.style.display = 'none';
+};
+
+window.procesarFotoArchivoQR = async function(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+
+  const html5QrCode = new Html5Qrcode("qrReaderViewHidden");
+  const panel = document.getElementById('qrPanelArchivo');
+  if (panel) {
+    panel.innerHTML += `
+      <div id="archivoProcesandoMsg" style="margin-top: 1rem; color: #38bdf8; font-size: 0.85rem;">
+        <span class="spinner" style="display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 0.3rem;"></span>
+        Analizando fotografía en busca de código QR...
+      </div>
+    `;
+  }
+
+  try {
+    const decodedText = await html5QrCode.scanFile(file, true);
+    emitirBeepExito();
+    const codigo = extraerCorrelativoDeQR(decodedText);
+    await cargarFichaAndamioModal(codigo);
+  } catch (err) {
+    alert('No se detectó un código QR legible en la imagen seleccionada. Verifique el enfoque, la iluminación o busque el andamio por número correlativo o tag.');
+    document.getElementById('archivoProcesandoMsg')?.remove();
+  } finally {
+    input.value = '';
+  }
+};
+
+window.buscarAndamiosEnVivo = async function(query) {
+  query = (query || '').toLowerCase().trim();
+  const filtroEstado = document.getElementById('filtroRapidoEstadoQR')?.value || 'TODOS';
+  const contenedor = document.getElementById('listaResultadosBusqueda');
+  if (!contenedor) return;
+
+  // Obtener lista completa si no está en memoria
+  let todas = AppState.todasSolicitudesGestionador;
+  if (!todas || todas.length === 0) {
+    try {
+      const res = await fetch('/api/solicitudes').then(r => r.json());
+      todas = res.solicitudes || [];
+      AppState.todasSolicitudesGestionador = todas;
+    } catch (e) {
+      todas = AppState.solicitudes || [];
+    }
+  }
+
+  const filtradas = todas.filter(s => {
+    if (filtroEstado === 'HABILITADOS' && !['HABILITADO'].includes(s.estado)) return false;
+    if (filtroEstado === 'DESHABILITADOS' && s.estado !== 'DESHABILITADO_HSE') return false;
+    if (filtroEstado === 'ALQUILER' && s.estado !== 'EN_ALQUILER') return false;
+    if (filtroEstado === 'DESARME' && !['DESARME_SOLICITADO', 'DESARMADO'].includes(s.estado)) return false;
+
+    if (!query) return true;
+
+    const corr = (s.numeroCorrelativo || '').toLowerCase();
+    const tarj = (s.tarjetaId || '').toLowerCase();
+    const sec = (s.sector || '').toLowerCase();
+    const ubi = (s.ubicacionTecnica || '').toLowerCase();
+    const prov = (s.proveedorAsignado || '').toLowerCase();
+    const solNom = (s.solicitanteNombre || '').toLowerCase();
+    const mot = (s.motivo || '').toLowerCase();
+    const tipo = (s.tipoAndamio || '').toLowerCase();
+
+    return corr.includes(query) || tarj.includes(query) || sec.includes(query) ||
+           ubi.includes(query) || prov.includes(query) || solNom.includes(query) ||
+           mot.includes(query) || tipo.includes(query);
+  });
+
+  if (filtradas.length === 0) {
+    contenedor.innerHTML = `
+      <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+        No se encontraron andamios que coincidan con la búsqueda.
+      </div>
+    `;
+    return;
+  }
+
+  contenedor.innerHTML = filtradas.map(s => {
+    const esDeshabilitadoHSE = s.estado === 'DESHABILITADO_HSE';
+    const esHabilitado = s.estado === 'HABILITADO';
+    const esAlquiler = s.estado === 'EN_ALQUILER';
+    const badgeColor = esDeshabilitadoHSE ? '#dc2626' : esHabilitado ? '#10b981' : esAlquiler ? '#f59e0b' : '#64748b';
+    const badgeText = esDeshabilitadoHSE ? '⛔ DESHABILITADO HSE' : esHabilitado ? '🟢 HABILITADO' : esAlquiler ? '🟡 EN ALQUILER' : s.estado;
+    const vol = s.totalVolumenRealM3 || s.dimSolicitadaAndamio?.volumenM3 || 0;
+
+    return `
+      <div class="search-result-card" onclick="cargarFichaAndamioModal('${s.numeroCorrelativo || s.id}')">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <strong style="color: #fff; font-size: 0.95rem;">${s.numeroCorrelativo || s.id}</strong>
+            <span style="background: ${badgeColor}; color: #fff; font-size: 0.68rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">
+              ${badgeText}
+            </span>
+          </div>
+          <div style="font-size: 0.8rem; color: #cbd5e1;">
+            📍 ${s.ubicacionTecnica || s.sector || 'Planta General'}
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">
+            🏗️ ${s.proveedorAsignado || 'Sin Asignar'} · 👤 ${s.solicitanteNombre || 'ARAUCO'} · 📦 ${vol} m³
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; white-space: nowrap;">
+          Ver Ficha ➔
+        </button>
+      </div>
+    `;
+  }).join('');
+};
+
+window.cargarFichaAndamioModal = async function(codigo) {
+  detenerEscanerCamaraQR();
+  const modalFicha = document.getElementById('qrPanelFichaResultado');
+  const tabsNav = document.getElementById('qrTabsNav');
+  if (!modalFicha) return;
+
+  // Ocultar pestañas mientras se ve la ficha
+  ['qrPanelCamara', 'qrPanelTexto', 'qrPanelArchivo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  if (tabsNav) tabsNav.style.display = 'none';
+
+  modalFicha.style.display = 'block';
+  modalFicha.innerHTML = `
+    <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+      <div class="spinner" style="margin: 0 auto 0.75rem; width: 28px; height: 28px;"></div>
+      Consultando registro del andamio ${codigo}...
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/solicitudes/verificar/' + encodeURIComponent(codigo)).then(r => r.json());
+    if (!res.ok || !res.solicitud) {
+      modalFicha.innerHTML = `
+        <div style="text-align: center; padding: 2rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
+          <h3 style="color: #ef4444; margin: 0 0 0.5rem 0;">Andamio No Encontrado</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+            No se encontró ningún registro para el código: <strong>${codigo}</strong>.<br>
+            Verifique el número correlativo o asegúrese de que el andamio esté cargado en el sistema.
+          </p>
+          <button class="btn btn-outline" onclick="volverAModosBuscadorQR()">⬅️ Volver a Buscar / Escanear</button>
+        </div>
+      `;
+      return;
+    }
+
+    renderFichaAndamioEnModal(res.solicitud);
+  } catch (err) {
+    modalFicha.innerHTML = `
+      <div style="text-align: center; padding: 2rem;">
+        <h3 style="color: #ef4444;">⚠️ Error de Conexión</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">No se pudo comunicar con el servidor central de ARAUCO.</p>
+        <button class="btn btn-outline" onclick="volverAModosBuscadorQR()">⬅️ Volver</button>
+      </div>
+    `;
+  }
+};
+
+window.volverAModosBuscadorQR = function() {
+  const modalFicha = document.getElementById('qrPanelFichaResultado');
+  if (modalFicha) modalFicha.style.display = 'none';
+  cambiarTabBuscadorQR('texto');
+};
+
+function renderFichaAndamioEnModal(sol) {
+  const modalFicha = document.getElementById('qrPanelFichaResultado');
+  if (!modalFicha) return;
+
+  const esHSE = AppState.usuario?.rol === 'GESTIONADOR' || (AppState.usuario?.email || '').toLowerCase().includes('hse');
+  const esContratista = AppState.usuario?.rol === 'EJECUTANTE';
+  const esDeshabilitadoHSE = sol.estado === 'DESHABILITADO_HSE';
+  const esHabilitado = sol.estado === 'HABILITADO';
+  const esAlquiler = sol.estado === 'EN_ALQUILER';
+  const vol = sol.totalVolumenRealM3 || sol.dimSolicitadaAndamio?.volumenM3 || 0;
+  const sup = sol.totalSuperficieRealM2 || sol.dimSolicitadaPlataforma?.superficieM2 || 0;
+
+  const evHSE = sol.eventoSeguridadHSE;
+
+  modalFicha.innerHTML = `
+    <div>
+      <!-- Barra superior de navegación de la ficha -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <button class="btn btn-outline btn-sm" onclick="volverAModosBuscadorQR()" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
+          ⬅️ Volver a Buscar / Escanear
+        </button>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">
+          Tarjeta: <strong style="color: var(--arauco-accent);">${sol.tarjetaId || 'S/N'}</strong>
+        </span>
+      </div>
+
+      <!-- Banner de Estado de Seguridad Operativa -->
+      ${esDeshabilitadoHSE ? `
+        <div style="background: #dc2626; color: #fff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);">
+          <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 1.1rem; font-weight: 800; margin-bottom: 0.3rem;">
+            <span>⛔</span> TARJETA ROJA — ANDAMIO DESHABILITADO POR SEGURIDAD (HSE)
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: #fee2e2;">
+            PROHIBIDO SUBIR O TRABAJAR SOBRE ESTA ESTRUCTURA
+          </div>
+          ${evHSE ? `
+            <div style="background: rgba(0,0,0,0.25); padding: 0.6rem; border-radius: 6px; font-size: 0.8rem; margin-top: 0.5rem;">
+              <div><strong>Causa Principal:</strong> ${evHSE.motivoPrincipal || 'Condiciones Inseguras'}</div>
+              ${evHSE.fallasObservadas?.length ? `<div style="margin-top: 0.2rem;"><strong>Desvíos:</strong> ${evHSE.fallasObservadas.join('; ')}</div>` : ''}
+              ${evHSE.observaciones ? `<div style="margin-top: 0.2rem;"><strong>Notas Inspector:</strong> "${evHSE.observaciones}"</div>` : ''}
+              <div style="margin-top: 0.3rem; font-size: 0.72rem; color: #fecaca;">
+                Bloqueado por: ${evHSE.inspectorNombre || 'Inspector HSE'} · ${evHSE.fecha ? new Date(evHSE.fecha).toLocaleString() : ''}
+              </div>
+            </div>
+            ${evHSE.fotoEvidencia ? `
+              <div style="margin-top: 0.6rem; display: flex; align-items: center; gap: 0.6rem;">
+                <img src="${evHSE.fotoEvidencia}" style="width: 70px; height: 50px; object-fit: cover; border-radius: 4px; border: 2px solid #fff; cursor: pointer;" onclick="abrirModalFotoHSE('${evHSE.fotoEvidencia}', 'Registro Fotográfico del Desvío HSE')" title="Click para ampliar">
+                <span style="font-size: 0.75rem; color: #fff; cursor: pointer; text-decoration: underline;" onclick="abrirModalFotoHSE('${evHSE.fotoEvidencia}', 'Registro Fotográfico del Desvío HSE')">
+                  🔍 Ver foto de la anomalía en grande
+                </span>
+              </div>
+            ` : ''}
+          ` : ''}
+        </div>
+      ` : esHabilitado ? `
+        <div style="background: #15803d; color: #fff; padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.5rem;">🟢</span>
+          <div>
+            <div style="font-weight: 800; font-size: 1rem;">ANDAMIO HABILITADO — ESTRUCTURA SEGURA</div>
+            <div style="font-size: 0.8rem; color: #dcfce7;">
+              Tarjeta Verde en vigencia · Apto para uso seguro según normas ARAUCO.
+            </div>
+          </div>
+        </div>
+      ` : esAlquiler ? `
+        <div style="background: #b45309; color: #fff; padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.5rem;">🟡</span>
+          <div>
+            <div style="font-weight: 800; font-size: 1rem;">ANDAMIO EN ALQUILER (> 30 DÍAS DE PERMANENCIA)</div>
+            <div style="font-size: 0.8rem; color: #fef3c7;">
+              Superó el periodo libre de montaje · Días acumulados: ${sol.diasPermanencia || 31}
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div style="background: #334155; color: #fff; padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem;">
+          <strong>Estado Operativo:</strong> ${sol.estado}
+        </div>
+      `}
+
+      <!-- Datos Técnicos y de Terreno -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.6rem; font-size: 0.85rem;">
+          <div><strong style="color: var(--text-muted);">N° Correlativo:</strong> <span style="color: #38bdf8; font-weight: 700;">${sol.numeroCorrelativo || sol.id}</span></div>
+          <div><strong style="color: var(--text-muted);">Ubicación / Tag:</strong> <strong>${sol.ubicacionTecnica || sol.sector}</strong></div>
+          <div><strong style="color: var(--text-muted);">Sector / Área:</strong> ${sol.sector}</div>
+          <div><strong style="color: var(--text-muted);">Empresa Contratista:</strong> <strong>${sol.proveedorAsignado || 'Sin Asignar'}</strong></div>
+          <div><strong style="color: var(--text-muted);">Solicitante ARAUCO:</strong> ${sol.solicitanteNombre || 'ARAUCO'}</div>
+          <div><strong style="color: var(--text-muted);">Volumen / Plataforma:</strong> <span style="color: #38bdf8; font-weight: 700;">${vol} m³</span> · <span style="color: #4ade80; font-weight: 700;">${sup} m²</span></div>
+          <div><strong style="color: var(--text-muted);">Fecha Montaje:</strong> ${sol.fechaArmado ? new Date(sol.fechaArmado).toLocaleDateString() : 'Pendiente'}</div>
+          <div><strong style="color: var(--text-muted);">Permanencia:</strong> ${sol.diasPermanencia || 0} días</div>
+        </div>
+
+        ${sol.fotoAndamioMontado ? `
+          <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.6rem; display: flex; align-items: center; gap: 0.75rem;">
+            <img src="${sol.fotoAndamioMontado}" style="width: 70px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer;" onclick="abrirModalFotoHSE('${sol.fotoAndamioMontado}', 'Fotografía Oficial de Montaje - ${sol.numeroCorrelativo}')" title="Click para ampliar">
+            <span style="font-size: 0.78rem; color: #94a3b8; cursor: pointer; text-decoration: underline;" onclick="abrirModalFotoHSE('${sol.fotoAndamioMontado}', 'Fotografía Oficial de Montaje - ${sol.numeroCorrelativo}')">
+              🖼️ Ver fotografía oficial del montaje
+            </span>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- Barra de Acciones Inmediatas -->
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+        ${esHSE && !esDeshabilitadoHSE ? `
+          <button class="btn" onclick="cerrarModalBuscadorQR(); abrirModalDeshabilitarHSE('${sol.id}')" style="background: #dc2626; color: #fff; font-weight: 700; padding: 0.4rem 0.8rem; font-size: 0.82rem; border-radius: 6px;">
+            🚫 Deshabilitar Andamio (HSE)
+          </button>
+        ` : ''}
+
+        ${esHSE && esDeshabilitadoHSE ? `
+          <button class="btn" onclick="cerrarModalBuscadorQR(); abrirModalRehabilitarHSE('${sol.id}')" style="background: #15803d; color: #fff; font-weight: 700; padding: 0.4rem 0.8rem; font-size: 0.82rem; border-radius: 6px;">
+            🟢 Re-Habilitar Andamio (HSE)
+          </button>
+        ` : ''}
+
+        ${esContratista && esDeshabilitadoHSE ? `
+          <button class="btn" onclick="cerrarModalBuscadorQR(); abrirModalSubsanarHSE('${sol.id}')" style="background: #eab308; color: #000; font-weight: 700; padding: 0.4rem 0.8rem; font-size: 0.82rem; border-radius: 6px;">
+            🔧 Enviar Subsanación
+          </button>
+        ` : ''}
+
+        <button class="btn btn-outline" onclick="imprimirTarjetaHabilitacion(${JSON.stringify(sol).replace(/"/g, '&quot;')})" style="padding: 0.4rem 0.8rem; font-size: 0.82rem;">
+          🖨️ Ver Tarjeta
+        </button>
+
+        <button class="btn btn-outline" onclick="window.open('/verificar.html?id=' + encodeURIComponent('${sol.numeroCorrelativo || sol.id}'), '_blank')" style="padding: 0.4rem 0.8rem; font-size: 0.82rem;">
+          🌐 Ficha Web Terreno
+        </button>
+      </div>
+
+    </div>
+  `;
+}

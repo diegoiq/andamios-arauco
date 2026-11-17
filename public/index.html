@@ -6,7 +6,7 @@
   <title>Gestión de Andamios ARAUCO - PWA</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1b4332">
-  <link rel="stylesheet" href="/styles.css?v=1.0.8">
+  <link rel="stylesheet" href="/styles.css?v=1.0.9">
 </head>
 <body>
 
@@ -20,12 +20,20 @@
       </div>
     </div>
 
-    <!-- Barra de Usuario Activo -->
-    <div class="user-bar" id="userBar" style="display: none;">
-      <span id="activeRoleBadge" class="role-badge">ROL</span>
-      <span id="activeUserName" style="font-weight: 600; font-size: 0.9rem;">Usuario</span>
-      <button class="btn btn-outline" id="btnCambiarClave" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;" onclick="abrirModalCambiarPassword()" title="Cambiar clave de mi usuario">🔑 Cambiar Clave</button>
-      <button class="btn btn-outline" id="btnLogout" title="Salir del sistema de forma segura">🔒 Cerrar Sesión</button>
+    <!-- Controles de Cabecera (Buscador / Escáner QR + Barra de Usuario) -->
+    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: flex-end;">
+      <button class="btn-scanner-header" id="btnHeaderScanner" onclick="abrirBuscadorEscaneoQR()" title="Buscar Andamio o Escanear Código QR con Cámara">
+        <span style="font-size: 1.05rem;">📷</span>
+        <span class="btn-scanner-text">Buscar / Escanear QR</span>
+      </button>
+
+      <!-- Barra de Usuario Activo -->
+      <div class="user-bar" id="userBar" style="display: none;">
+        <span id="activeRoleBadge" class="role-badge">ROL</span>
+        <span id="activeUserName" style="font-weight: 600; font-size: 0.9rem;">Usuario</span>
+        <button class="btn btn-outline" id="btnCambiarClave" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;" onclick="abrirModalCambiarPassword()" title="Cambiar clave de mi usuario">🔑 Cambiar Clave</button>
+        <button class="btn btn-outline" id="btnLogout" title="Salir del sistema de forma segura">🔒 Cerrar Sesión</button>
+      </div>
     </div>
   </header>
 
@@ -55,7 +63,8 @@
       });
     }
   </script>
+  <script src="/html5-qrcode.min.js"></script>
   <script src="/qrcode.js"></script>
-  <script src="/app.js?v=1.0.8"></script>
+  <script src="/app.js?v=1.0.9"></script>
 </body>
 </html>

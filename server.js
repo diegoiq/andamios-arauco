@@ -1017,11 +1017,19 @@ app.get('/api/sistema/info', (req, res) => {
 app.get('/api/solicitudes/verificar/:id', (req, res) => {
   const { id } = req.params;
   const db = getDb();
-  const sol = db.solicitudes.find(s => 
-    (s.numeroCorrelativo && s.numeroCorrelativo.toLowerCase() === id.toLowerCase()) ||
-    (s.tarjetaId && s.tarjetaId.toLowerCase() === id.toLowerCase()) ||
-    s.id === id
-  );
+  const cleanId = (id || '').trim().toLowerCase();
+  
+  const sol = db.solicitudes.find(s => {
+    const numCorr = (s.numeroCorrelativo || '').toLowerCase();
+    const tarj = (s.tarjetaId || '').toLowerCase();
+    const sId = (s.id || '').toLowerCase();
+    if (numCorr === cleanId || tarj === cleanId || sId === cleanId) return true;
+    
+    // Si se pasa solo el sufijo numérico (ej: 0001 o 1)
+    const digitsOnly = cleanId.replace(/\D/g, '');
+    if (digitsOnly && numCorr.endsWith(digitsOnly)) return true;
+    return false;
+  });
 
   if (!sol) {
     return res.status(404).json({ ok: false, error: 'Andamio no registrado o código inválido' });
@@ -1037,7 +1045,7 @@ app.get('/api/solicitudes/verificar/:id', (req, res) => {
     }
   }
 
-  // Devolver únicamente información técnica y de seguridad relevante para terreno
+  // Devolver información técnica y de seguridad completa para terreno
   res.json({
     ok: true,
     solicitud: {
@@ -1050,7 +1058,11 @@ app.get('/api/solicitudes/verificar/:id', (req, res) => {
       centroCostos: sol.centroCostos,
       ubicacionTecnica: sol.ubicacionTecnica,
       motivo: sol.motivo,
+      solicitanteNombre: sol.solicitanteNombre,
       proveedorAsignado: sol.proveedorAsignado,
+      tipoAndamio: sol.tipoAndamio,
+      dimSolicitadaAndamio: sol.dimSolicitadaAndamio,
+      dimSolicitadaPlataforma: sol.dimSolicitadaPlataforma,
       totalVolumenRealM3: sol.totalVolumenRealM3 || sol.dimSolicitadaAndamio?.volumenM3 || 0,
       totalSuperficieRealM2: sol.totalSuperficieRealM2 || sol.dimSolicitadaPlataforma?.superficieM2 || 0,
       regimenHorarioReal: sol.regimenHorarioReal,
@@ -1060,6 +1072,9 @@ app.get('/api/solicitudes/verificar/:id', (req, res) => {
       fotoAndamioMontado: sol.fotoAndamioMontado,
       checklistHabilitacion: sol.checklistHabilitacion,
       estadoAuditoria: sol.estadoAuditoria || 'PENDIENTE_AUDITORIA',
+      eventoSeguridadHSE: sol.eventoSeguridadHSE || null,
+      subsanacionHSE: sol.subsanacionHSE || null,
+      historialSeguridad: sol.historialSeguridad || [],
       reformas: sol.reformas || []
     }
   });

@@ -1,10 +1,11 @@
-const CACHE_NAME = 'andamios-arauco-v3';
+const CACHE_NAME = 'andamios-arauco-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/verificar.html',
   '/styles.css',
   '/qrcode.js',
+  '/html5-qrcode.min.js',
   '/manifest.json'
 ];
 
