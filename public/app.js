@@ -1076,43 +1076,43 @@ async function renderPortalSolicitante(container, user) {
 
   container.innerHTML = `
     <div class="info-card dashboard-hero">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
         <div>
-          <h2 style="margin: 0; font-size: 1.2rem;">👤 Portal del Solicitante</h2>
-          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
+          <h2 style="margin: 0; font-size: 1.15rem; color: #fff;">👤 Portal del Solicitante</h2>
+          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0 0;">
             Usuario: <strong>${user.nombre}</strong> | Sector: <strong>${user.sector || 'Planta'}</strong> | Legajo: <strong>${user.legajo || 'N/A'}</strong> | CC: <strong>${user.centroCostos || 'N/A'}</strong>
           </p>
         </div>
-        <div class="dashboard-header-kpis">
-          <div class="calc-box-compact">
-            <div class="calc-val" style="font-size: 1.15rem;">${met.totalPedidos}</div>
-            <div class="calc-label">Total Pedidos</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="font-size: 1.15rem; color: #38bdf8;">${met.totalM3Solicitado} m³</div>
-            <div class="calc-label">Volumen Solicitado</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="font-size: 1.15rem; color: #4ade80;">${met.totalM2Solicitado} m²</div>
-            <div class="calc-label">Plat. Solicitadas</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="font-size: 1.15rem; color: #f59e0b;">${met.paraDesarme}</div>
-            <div class="calc-label">Para Desarme</div>
-          </div>
+      </div>
+      <div class="header-kpis-grid">
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #3b82f6;">${met.totalPedidos}</div>
+          <div class="calc-label">Total Pedidos</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #38bdf8;">${met.totalM3Solicitado} m³</div>
+          <div class="calc-label">Volumen Solicitado</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #4ade80;">${met.totalM2Solicitado} m²</div>
+          <div class="calc-label">Plataformas</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #f59e0b;">${met.paraDesarme}</div>
+          <div class="calc-label">Para Desarme</div>
         </div>
       </div>
     </div>
 
     <div class="tabs-nav">
       <button class="tab-btn ${AppState.activeTabSolicitante === 'anual' ? 'active' : ''}" onclick="cambiarTabSolicitante('anual')">
-        📋 1. Solicitud Anual (Marcha Normal)
+        📋 1. Solicitud Anual (Normal)
       </button>
       <button class="tab-btn ${AppState.activeTabSolicitante === 'pgp' ? 'active' : ''}" onclick="cambiarTabSolicitante('pgp')">
-        📊 2. Parada General (Carga Masiva Excel)
+        📊 2. Parada General (Excel)
       </button>
       <button class="tab-btn ${AppState.activeTabSolicitante === 'historico' ? 'active' : ''}" onclick="cambiarTabSolicitante('historico')">
-        📂 3. Histórico de Pedidos & Copiar Pedido (${AppState.misSolicitudes.length})
+        📂 3. Histórico & Copiar (${AppState.misSolicitudes.length})
       </button>
     </div>
 
@@ -1800,58 +1800,63 @@ async function renderPortalGestionador(container, user) {
 
   container.innerHTML = `
     <div class="info-card dashboard-hero">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
         <div>
-          <h2 style="margin: 0; font-size: 1.2rem;">🛡️ Centro de Control del Gestionador (Admin ARAUCO)</h2>
-          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
+          <h2 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            🛡️ Centro de Control del Gestionador
+            <span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 600;">Admin ARAUCO</span>
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0 0;">
             Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación
           </p>
         </div>
-        <div class="dashboard-header-kpis">
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #3b82f6; font-size: 1.15rem;">${m.solicitados}</div>
-            <div class="calc-label">Nuevos Pedidos</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${m.activosPlanta}</div>
-            <div class="calc-label">Activos en Planta</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${m.enAlquiler}</div>
-            <div class="calc-label">En Alquiler (>30d)</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${m.desarmesPendientes}</div>
-            <div class="calc-label">Desarmes Pendientes</div>
-          </div>
+      </div>
+
+      <!-- Métricas abajo en 4 columnas completas (diseño solicitado) -->
+      <div class="header-kpis-grid">
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #3b82f6;">${m.solicitados}</div>
+          <div class="calc-label">Nuevos Pedidos</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #10b981;">${m.activosPlanta}</div>
+          <div class="calc-label">Activos en Planta</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #ef4444;">${m.enAlquiler}</div>
+          <div class="calc-label">En Alquiler (>30d)</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #f59e0b;">${m.desarmesPendientes}</div>
+          <div class="calc-label">Desarmes Pendientes</div>
         </div>
       </div>
     </div>
 
     <div class="tabs-nav">
       <button class="tab-btn ${AppState.activeTabGestionador === 'semanal' ? 'active' : ''}" onclick="cambiarTabGestionador('semanal')" style="border-left: 3px solid #38bdf8; font-weight: 700;">
-        📅 Vista Semanal (Mié - Mar)
+        📅 Vista Semanal
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'bandeja' ? 'active' : ''}" onclick="cambiarTabGestionador('bandeja')">
-        📥 1. Bandeja de Pedidos & Programación (${m.solicitados + m.programados})
+        📥 1. Bandeja (${m.solicitados + m.programados})
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'parque' ? 'active' : ''}" onclick="cambiarTabGestionador('parque')">
-        🏗️ 2. Parque Activo en Planta (${m.activosPlanta})
+        🏗️ 2. Parque Activo (${m.activosPlanta})
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'desarmes' ? 'active' : ''}" onclick="cambiarTabGestionador('desarmes')">
-        🚩 3. Avisos & Asignación de Desarme (${m.desarmesPendientes})
+        🚩 3. Desarmes (${m.desarmesPendientes})
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'certificacion' ? 'active' : ''}" onclick="cambiarTabGestionador('certificacion')">
-        📑 4. Certificación Oficial (18 Ítems + PGP)
+        📑 4. Certificación
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'auditoria' ? 'active' : ''}" onclick="cambiarTabGestionador('auditoria')">
-        🔍 5. Auditoría & Rectificación Pre-Certificación
+        🔍 5. Auditoría
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'kpis' ? 'active' : ''}" onclick="cambiarTabGestionador('kpis')">
-        📈 6. Métricas & Metraje (${m.m3ActivosPlanta} m³)
+        📈 6. Métricas (${m.m3ActivosPlanta} m³)
       </button>
       <button class="tab-btn ${AppState.activeTabGestionador === 'solicitar' ? 'active' : ''}" onclick="cambiarTabGestionador('solicitar')">
-        ➕ 7. Solicitar Andamio (Admin)
+        ➕ 7. Solicitar (Admin)
       </button>
     </div>
 
@@ -2042,7 +2047,7 @@ function renderVistaSemanalGestionador(container) {
     `<span class="status-badge" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem;">SEMANA OFFSET (${AppState.semanaOffset > 0 ? '+' : ''}${AppState.semanaOffset})</span>`;
 
   container.innerHTML = `
-    <!-- Barra Superior de Navegación de Semanas Operativas -->
+    <!-- Barra Superior y Métricas de la Semana Operativa en Tarjeta Única -->
     <div class="info-card" style="margin-bottom: 0.65rem; padding: 0.6rem 0.85rem;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
         <div>
@@ -2050,79 +2055,72 @@ function renderVistaSemanalGestionador(container) {
             <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">📅 Vista Semanal Operativa (Miércoles a Martes)</h3>
             ${badgeEstadoSemana}
           </div>
-          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
-            Ciclo Oficial ARAUCO: <strong>${rangoTexto}</strong> · Programación, Control de Metraje & Vencimientos
+          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.15rem 0 0 0;">
+            Ciclo Oficial ARAUCO: <strong>${rangoTexto}</strong> · Programación & Vencimientos
           </p>
         </div>
 
         <!-- Controles de Navegación Temporal -->
-        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(-1)" title="Ir a la semana operativa anterior" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+        <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+          <button class="btn btn-outline btn-sm" onclick="navegarSemana(-1)" title="Semana anterior" style="padding: 0.2rem 0.45rem; font-size: 0.78rem;">
             ◀ Anterior
           </button>
-          <button class="btn btn-sm ${AppState.semanaOffset === 0 ? 'btn-outline' : ''}" style="${AppState.semanaOffset === 0 ? 'border-color: #10b981; color: #10b981;' : 'background: #10b981; color: #fff;'} padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="irSemanaActual()" title="Regresar a la semana actual">
+          <button class="btn btn-sm ${AppState.semanaOffset === 0 ? 'btn-outline' : ''}" style="${AppState.semanaOffset === 0 ? 'border-color: #10b981; color: #10b981;' : 'background: #10b981; color: #fff;'} padding: 0.2rem 0.45rem; font-size: 0.78rem;" onclick="irSemanaActual()" title="Semana actual">
             🔄 Actual
           </button>
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(1)" title="Ir a la próxima semana operativa" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+          <button class="btn btn-outline btn-sm" onclick="navegarSemana(1)" title="Próxima semana" style="padding: 0.2rem 0.45rem; font-size: 0.78rem;">
             Siguiente ▶
           </button>
-          <button class="btn btn-outline btn-sm" onclick="window.print()" style="margin-left: 0.2rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="Imprimir programa semanal">
-            🖨️ Imprimir
+          <button class="btn btn-outline btn-sm" onclick="window.print()" style="margin-left: 0.2rem; padding: 0.2rem 0.45rem; font-size: 0.78rem;" title="Imprimir programa">
+            🖨️
           </button>
         </div>
       </div>
 
       <!-- Filtros Rápidos de la Semana -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
-        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-          <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin: 0;">Empresa:</label>
-          <select id="filtroEmpresaSemanal" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: auto;" onchange="cambiarFiltroEmpresaSemanal(this.value)">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.4rem;">
+        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+          <label style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); margin: 0;">Empresa:</label>
+          <select id="filtroEmpresaSemanal" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: auto;" onchange="cambiarFiltroEmpresaSemanal(this.value)">
             <option value="TODAS" ${AppState.filtroEmpresaSemanal === 'TODAS' ? 'selected' : ''}>Todas las Empresas</option>
             <option value="Andamios del Sur S.A." ${AppState.filtroEmpresaSemanal === 'Andamios del Sur S.A.' ? 'selected' : ''}>Andamios del Sur S.A.</option>
             <option value="Montajes Industriales S.A." ${AppState.filtroEmpresaSemanal === 'Montajes Industriales S.A.' ? 'selected' : ''}>Montajes Industriales S.A.</option>
           </select>
 
-          <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin: 0 0 0 0.3rem;">Evento:</label>
-          <select id="filtroEventoSemanal" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: auto;" onchange="cambiarFiltroEventoSemanal(this.value)">
+          <label style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); margin: 0 0 0 0.3rem;">Evento:</label>
+          <select id="filtroEventoSemanal" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: auto;" onchange="cambiarFiltroEventoSemanal(this.value)">
             <option value="TODOS" ${AppState.filtroEventoSemanal === 'TODOS' ? 'selected' : ''}>Todos los Eventos</option>
-            <option value="PROGRAMADO" ${AppState.filtroEventoSemanal === 'PROGRAMADO' ? 'selected' : ''}>🔵 Montajes Programados</option>
-            <option value="HABILITADO" ${AppState.filtroEventoSemanal === 'HABILITADO' ? 'selected' : ''}>🟢 Habilitados en Sitio</option>
+            <option value="PROGRAMADO" ${AppState.filtroEventoSemanal === 'PROGRAMADO' ? 'selected' : ''}>🔵 Programados</option>
+            <option value="HABILITADO" ${AppState.filtroEventoSemanal === 'HABILITADO' ? 'selected' : ''}>🟢 Habilitados</option>
             <option value="DESARME" ${AppState.filtroEventoSemanal === 'DESARME' ? 'selected' : ''}>🔴 Desarmes</option>
-            <option value="ALQUILER" ${AppState.filtroEventoSemanal === 'ALQUILER' ? 'selected' : ''}>🟡 Alertas 30 Días</option>
+            <option value="ALQUILER" ${AppState.filtroEventoSemanal === 'ALQUILER' ? 'selected' : ''}>🟡 Alertas 30d</option>
           </select>
         </div>
 
-        <div style="display: flex; gap: 0.35rem; align-items: center;">
-          <input type="text" id="busquedaSemanalInput" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal}" style="padding: 0.25rem 0.5rem; font-size: 0.78rem; width: 200px;" oninput="handleBusquedaSemanalInput(this.value)">
-          ${AppState.busquedaSemanal ? `<button class="btn btn-outline btn-sm" onclick="limpiarBusquedaSemanal()" style="padding: 0.2rem 0.4rem;">✖</button>` : ''}
+        <div style="display: flex; gap: 0.3rem; align-items: center;">
+          <input type="text" id="busquedaSemanalInput" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal}" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: 190px;" oninput="handleBusquedaSemanalInput(this.value)">
+          ${AppState.busquedaSemanal ? `<button class="btn btn-outline btn-sm" onclick="limpiarBusquedaSemanal()" style="padding: 0.15rem 0.35rem;">✖</button>` : ''}
         </div>
       </div>
-    </div>
 
-    <!-- KPIs Rápidos de la Semana Operativa -->
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
-      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
-        <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${totalEventosSemana}</div>
-        <div class="calc-label">Movimientos Ciclo</div>
-        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">7 días operativos</small>
-      </div>
-
-      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
-        <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${andamiosActivosSemana.length}</div>
-        <div class="calc-label">Activos en Planta</div>
-        <small style="font-size: 0.65rem; color: #4ade80; display: block;">${m3TotalActivoSemana.toFixed(1)} m³ · ${m2TotalActivoSemana.toFixed(1)} m²</small>
-      </div>
-
-      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
-        <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${andamiosEnAlquilerSemana.length}</div>
-        <div class="calc-label">En Alquiler (>30d)</div>
-        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">Permanencia excedida</small>
-      </div>
-
-      <div class="calc-box-compact" style="flex: 1; min-width: 140px; padding: 0.35rem 0.6rem;">
-        <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${desarmesSemana.length}</div>
-        <div class="calc-label">Desarmes en Proceso</div>
-        <small style="font-size: 0.65rem; color: var(--text-muted); display: block;">Liberación de material</small>
+      <!-- KPIs de la Semana Operativa en la Fila Inferior de la Tarjeta -->
+      <div class="header-kpis-grid" style="margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1px solid var(--border);">
+        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
+          <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${totalEventosSemana}</div>
+          <div class="calc-label">Movimientos Ciclo</div>
+        </div>
+        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
+          <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${andamiosActivosSemana.length}</div>
+          <div class="calc-label">${m3TotalActivoSemana.toFixed(1)} m³ · ${m2TotalActivoSemana.toFixed(1)} m²</div>
+        </div>
+        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
+          <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${andamiosEnAlquilerSemana.length}</div>
+          <div class="calc-label">En Alquiler (>30d)</div>
+        </div>
+        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
+          <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${desarmesSemana.length}</div>
+          <div class="calc-label">Desarmes en Proceso</div>
+        </div>
       </div>
     </div>
 
@@ -3426,43 +3424,45 @@ async function renderPortalEjecutante(container, user) {
 
   container.innerHTML = `
     <div class="info-card dashboard-hero">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
         <div>
-          <h2 style="margin: 0; font-size: 1.2rem;">👷 Portal de Empresa Ejecutora / Contratista</h2>
-          <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.2rem 0 0 0;">
+          <h2 style="margin: 0; font-size: 1.15rem; color: #fff;">👷 Portal de Empresa Ejecutora / Contratista</h2>
+          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0 0;">
             Empresa Asignada: <strong>${user.empresaNombre || 'Contratista Externa'}</strong> | Supervisor: <strong>${user.nombre}</strong>
           </p>
         </div>
-        <div class="dashboard-header-kpis">
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${m.pendientesArmar}</div>
-            <div class="calc-label">Para Armar</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${m.activos}</div>
-            <div class="calc-label">Activos / Hab.</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${m.pendientesDesarmar}</div>
-            <div class="calc-label">Para Desarmar</div>
-          </div>
-          <div class="calc-box-compact">
-            <div class="calc-val" style="color: #a855f7; font-size: 1.15rem;">${m.m3Ejecutados} m³</div>
-            <div class="calc-label">Metraje Ejecutado</div>
-          </div>
+      </div>
+
+      <!-- Métricas abajo en 4 columnas completas -->
+      <div class="header-kpis-grid">
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #38bdf8;">${m.pendientesArmar}</div>
+          <div class="calc-label">Para Armar</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #10b981;">${m.activos}</div>
+          <div class="calc-label">Activos / Hab.</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #f59e0b;">${m.pendientesDesarmar}</div>
+          <div class="calc-label">Para Desarmar</div>
+        </div>
+        <div class="calc-box-compact">
+          <div class="calc-val" style="color: #a855f7;">${m.m3Ejecutados} m³</div>
+          <div class="calc-label">Metraje Ejecutado</div>
         </div>
       </div>
     </div>
 
     <div class="tabs-nav">
       <button class="tab-btn ${AppState.activeTabEjecutante === 'ordenes' ? 'active' : ''}" onclick="cambiarTabEjecutante('ordenes')">
-        📦 1. Órdenes de Montaje Asignadas (${m.pendientesArmar})
+        📦 1. Órdenes (${m.pendientesArmar})
       </button>
       <button class="tab-btn ${AppState.activeTabEjecutante === 'desarmes' ? 'active' : ''}" onclick="cambiarTabEjecutante('desarmes')">
-        🔧 2. Órdenes de Desarme con Foto (${m.pendientesDesarmar})
+        🔧 2. Desarmes (${m.pendientesDesarmar})
       </button>
       <button class="tab-btn ${AppState.activeTabEjecutante === 'produccion' ? 'active' : ''}" onclick="cambiarTabEjecutante('produccion')">
-        📊 3. Mi Producción & Tarjetas (${m.totalAsignados})
+        📊 3. Mi Producción (${m.totalAsignados})
       </button>
     </div>
 

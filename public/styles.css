@@ -235,34 +235,41 @@ input:focus, select:focus, textarea:focus {
 
 /* Dashboard Hero & Compact KPI Strip */
 .dashboard-hero {
-  padding: 0.6rem 1rem;
+  padding: 0.65rem 0.95rem;
   margin-bottom: 0.75rem;
 }
 .dashboard-hero h2 {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   margin: 0;
 }
 .dashboard-hero p {
   margin: 0.2rem 0 0 0;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
-.dashboard-header-kpis {
-  display: flex;
-  align-items: center;
+.header-kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
-  flex-wrap: wrap;
+}
+@media (max-width: 768px) {
+  .header-kpis-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 .calc-box-compact {
-  background-color: rgba(15, 23, 42, 0.65);
+  background-color: rgba(15, 23, 42, 0.75);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.35rem 0.65rem;
+  padding: 0.4rem 0.5rem;
   text-align: center;
-  min-width: 95px;
-  flex: 0 1 auto;
+  transition: all 0.15s ease;
+}
+.calc-box-compact:hover {
+  border-color: var(--arauco-accent);
+  background-color: rgba(15, 23, 42, 0.9);
 }
 .calc-box-compact .calc-val {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.1;
 }
