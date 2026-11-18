@@ -118,77 +118,101 @@ function verificarSesion() {
   renderLogin();
 }
 
-function actualizarUserBar() {
-  const userBar = document.getElementById('userBar');
-  const roleBadge = document.getElementById('activeRoleBadge');
-  const userName = document.getElementById('activeUserName');
-  const btnLogout = document.getElementById('btnLogout');
+window.toggleUserDropdown = function(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('userDropdownMenu');
+  if (!menu) return;
+  const isHidden = menu.style.display === 'none';
+  menu.style.display = isHidden ? 'block' : 'none';
+};
 
-  if (!userBar) return;
+window.closeUserDropdown = function() {
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) menu.style.display = 'none';
+};
+
+document.addEventListener('click', (e) => {
+  const wrapper = document.getElementById('userMenuWrapper');
+  if (wrapper && !wrapper.contains(e.target)) {
+    window.closeUserDropdown();
+  }
+});
+
+window.toggleModoAdminFromDropdown = function() {
+  window.closeUserDropdown();
+  AppState.adminViewMode = AppState.adminViewMode === 'SOLICITANTE' ? 'GESTIONADOR' : 'SOLICITANTE';
+  actualizarUserBar();
+  renderPortalPorRol();
+};
+
+window.logoutUsuario = function() {
+  window.closeUserDropdown();
+  if (confirm('¿Desea cerrar la sesión actual?')) {
+    localStorage.removeItem('arauco_user');
+    AppState.currentUser = null;
+    actualizarUserBar();
+    renderLogin();
+  }
+};
+
+function actualizarUserBar() {
+  const userMenuWrapper = document.getElementById('userMenuWrapper');
+  const userBarOld = document.getElementById('userBar');
+  if (userBarOld) userBarOld.style.display = 'none';
 
   if (!AppState.currentUser) {
-    userBar.style.display = 'none';
+    if (userMenuWrapper) userMenuWrapper.style.display = 'none';
     return;
   }
 
-  userBar.style.display = 'flex';
-  const esHSE = (AppState.currentUser.email === 'auditor.hse@arauco.com') || (AppState.currentUser.sector && AppState.currentUser.sector.includes('HSE'));
-  const btnClave = document.getElementById('btnCambiarClave');
-  let btnToggle = document.getElementById('btnToggleModoAdmin');
+  if (userMenuWrapper) userMenuWrapper.style.display = 'inline-block';
 
-  if (esHSE) {
-    roleBadge.textContent = '🦺 SEGURIDAD HSE';
-    roleBadge.className = 'role-badge';
-    roleBadge.style.cssText = 'background: #dc2626; color: #fff; font-weight: 800;';
-    if (btnToggle) btnToggle.style.display = 'none';
-    if (btnClave) btnClave.style.display = 'none';
-  } else {
-    if (btnClave) btnClave.style.display = 'inline-block';
-    const rol = AppState.currentUser.rol;
-    roleBadge.textContent = rol === 'SOLICITANTE' ? 'SOLICITANTE' :
-      rol === 'GESTIONADOR' ? 'ADMIN GESTIONADOR' : 'EMPRESA EJECUTORA';
+  const user = AppState.currentUser;
+  const esHSE = (user.email === 'auditor.hse@arauco.com') || (user.sector && user.sector.includes('HSE'));
 
-    roleBadge.className = 'role-badge ' + (
-      rol === 'SOLICITANTE' ? 'solicitante' :
-        rol === 'GESTIONADOR' ? 'gestionador' : 'ejecutante'
-    );
-    roleBadge.style.cssText = '';
+  // Iniciales del avatar
+  const partes = (user.nombre || 'U').trim().split(' ');
+  const iniciales = partes.length > 1 ? (partes[0][0] + partes[partes.length - 1][0]).toUpperCase() : partes[0].slice(0, 2).toUpperCase();
 
-    // Botón para alternar a Modo Solicitante si es Admin / Gestionador
-    if (rol === 'GESTIONADOR') {
-      if (!btnToggle) {
-        btnToggle = document.createElement('button');
-        btnToggle.id = 'btnToggleModoAdmin';
-        btnToggle.className = 'btn btn-outline';
-        btnToggle.style.cssText = 'font-size: 0.8rem; padding: 0.35rem 0.65rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;';
-        userBar.insertBefore(btnToggle, btnLogout);
+  const avatar = document.getElementById('userAvatarCircle');
+  if (avatar) avatar.textContent = iniciales;
+
+  const nameShort = document.getElementById('activeUserNameShort');
+  if (nameShort) nameShort.textContent = user.nombre;
+
+  const roleShort = document.getElementById('activeRoleBadgeShort');
+  if (roleShort) {
+    roleShort.textContent = esHSE ? 'Seguridad HSE' :
+      user.rol === 'GESTIONADOR' ? (AppState.adminViewMode === 'SOLICITANTE' ? 'Modo Solicitante' : 'Admin Gestionador') :
+      user.rol === 'SOLICITANTE' ? 'Solicitante' : 'Contratista';
+  }
+
+  const dropdownName = document.getElementById('dropdownFullName');
+  if (dropdownName) dropdownName.textContent = user.nombre;
+
+  const dropdownRole = document.getElementById('dropdownRoleInfo');
+  if (dropdownRole) {
+    dropdownRole.textContent = esHSE ? 'Auditor HSE · Seguridad y Medio Ambiente' :
+      `${user.sector || user.empresaNombre || 'Planta Industrial'} · ${user.rol === 'GESTIONADOR' ? 'Admin ARAUCO' : user.rol}`;
+  }
+
+  const btnModo = document.getElementById('btnDropdownToggleModo');
+  const btnModoText = document.getElementById('btnDropdownToggleModoText');
+  if (btnModo) {
+    if (user.rol === 'GESTIONADOR' && !esHSE) {
+      btnModo.style.display = 'flex';
+      if (btnModoText) {
+        btnModoText.textContent = AppState.adminViewMode === 'SOLICITANTE' ? 'Volver a Centro de Control' : 'Modo Solicitante';
       }
-      btnToggle.style.display = 'inline-flex';
-      if (AppState.adminViewMode === 'SOLICITANTE') {
-        btnToggle.innerHTML = '🛡️ Volver a Centro de Control';
-        btnToggle.title = 'Regresar al Panel de Gestión General';
-      } else {
-        btnToggle.innerHTML = '📝 Modo Solicitante';
-        btnToggle.title = 'Operar como solicitante para cargar pedidos propios o planillas masivas';
-      }
-      btnToggle.onclick = () => {
-        AppState.adminViewMode = AppState.adminViewMode === 'SOLICITANTE' ? 'GESTIONADOR' : 'SOLICITANTE';
-        actualizarUserBar();
-        renderPortalPorRol();
-      };
     } else {
-      if (btnToggle) btnToggle.style.display = 'none';
+      btnModo.style.display = 'none';
     }
   }
 
-  btnLogout.onclick = () => {
-    if (confirm('¿Desea cerrar la sesión actual?')) {
-      localStorage.removeItem('andamios_session');
-      AppState.currentUser = null;
-      actualizarUserBar();
-      renderLogin();
-    }
-  };
+  const btnClave = document.getElementById('btnDropdownCambiarClave');
+  if (btnClave) {
+    btnClave.style.display = esHSE ? 'none' : 'flex';
+  }
 }
 
 /* ========================================================
@@ -1814,77 +1838,88 @@ async function renderPortalGestionador(container, user) {
 
   if (esHSE) {
     // Para el perfil de Seguridad e Higiene: Vista directa, limpia y 100% enfocada
-    // Se eliminan la caja superior redundante de pedidos/desarmes y las 7 pestañas ajenas a HSE
     renderAuditoriaGestionador(container);
     return;
   }
 
-  const tituloPortal = '🛡️ Centro de Control del Gestionador';
-  const badgeRol = 'Admin ARAUCO';
-  const subTituloPortal = `Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación`;
+  if (!AppState.activeTabGestionador) {
+    AppState.activeTabGestionador = 'semanal';
+  }
 
   container.innerHTML = `
-    <div class="info-card dashboard-hero">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-        <div>
-          <h2 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-            ${tituloPortal}
-            <span style="font-size: 0.72rem; background: ${esHSE ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.15)'}; color: ${esHSE ? '#fca5a5' : '#38bdf8'}; border: 1px solid ${esHSE ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.3)'}; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 600;">${badgeRol}</span>
-          </h2>
-          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.2rem 0 0 0;">
-            ${subTituloPortal}
-          </p>
-        </div>
-      </div>
-
-      <!-- Métricas abajo en 4 columnas completas (diseño solicitado) -->
-      <div class="header-kpis-grid">
-        <div class="calc-box-compact">
-          <div class="calc-val" style="color: #3b82f6;">${m.solicitados}</div>
-          <div class="calc-label">Nuevos Pedidos</div>
-        </div>
-        <div class="calc-box-compact">
-          <div class="calc-val" style="color: #10b981;">${m.activosPlanta}</div>
-          <div class="calc-label">Activos en Planta</div>
-        </div>
-        <div class="calc-box-compact">
-          <div class="calc-val" style="color: ${deshabilitadosHSECount > 0 ? '#ef4444' : '#64748b'}; font-weight: 900;">${deshabilitadosHSECount}</div>
-          <div class="calc-label" style="color: ${deshabilitadosHSECount > 0 ? '#fca5a5' : 'var(--text-muted)'};">Deshabilitados HSE ⛔</div>
-        </div>
-        <div class="calc-box-compact">
-          <div class="calc-val" style="color: #f59e0b;">${m.desarmesPendientes}</div>
-          <div class="calc-label">Desarmes Pendientes</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="tabs-nav">
-      <button class="tab-btn ${AppState.activeTabGestionador === 'semanal' ? 'active' : ''}" onclick="cambiarTabGestionador('semanal')" style="border-left: 3px solid #38bdf8; font-weight: 700;">
-        📅 Vista Semanal
+    <!-- Barra de Pestañas Principal Limpia (Sin números ni emojis multicolor) -->
+    <div class="tabs-nav-clean">
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'semanal' ? 'active' : ''}" onclick="cambiarTabGestionador('semanal')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span>Tablero Semanal</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'bandeja' ? 'active' : ''}" onclick="cambiarTabGestionador('bandeja')">
-        📥 1. Bandeja (${m.solicitados + m.programados})
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'bandeja' ? 'active' : ''}" onclick="cambiarTabGestionador('bandeja')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+        <span>Bandeja</span>
+        <span class="pill-badge ${m.solicitados + m.programados > 0 ? 'pill-active' : ''}">${m.solicitados + m.programados}</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'parque' ? 'active' : ''}" onclick="cambiarTabGestionador('parque')">
-        🏗️ 2. Parque Activo (${m.activosPlanta})
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'parque' ? 'active' : ''}" onclick="cambiarTabGestionador('parque')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <span>Parque Activo</span>
+        <span class="pill-badge ${m.activosPlanta > 0 ? 'pill-active' : ''}">${m.activosPlanta}</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'desarmes' ? 'active' : ''}" onclick="cambiarTabGestionador('desarmes')">
-        🚩 3. Desarmes (${m.desarmesPendientes})
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'desarmes' ? 'active' : ''}" onclick="cambiarTabGestionador('desarmes')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+        <span>Desarmes</span>
+        <span class="pill-badge ${m.desarmesPendientes > 0 ? 'pill-active' : ''}">${m.desarmesPendientes}</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'certificacion' ? 'active' : ''}" onclick="cambiarTabGestionador('certificacion')">
-        📑 4. Certificación
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'certificacion' ? 'active' : ''}" onclick="cambiarTabGestionador('certificacion')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Certificación</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'auditoria' ? 'active' : ''}" onclick="cambiarTabGestionador('auditoria')" style="${deshabilitadosHSECount > 0 ? 'border-bottom: 2px solid #ef4444; color: #f87171;' : ''}">
-        🦺 5. Seg. & Higiene ${deshabilitadosHSECount > 0 ? `<span style="background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">${deshabilitadosHSECount} ⚠️</span>` : ''}
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'auditoria' ? 'active' : ''}" onclick="cambiarTabGestionador('auditoria')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span>Seg. & Higiene</span>
+        ${deshabilitadosHSECount > 0 ? `<span class="pill-badge-rose">${deshabilitadosHSECount} ⚠️</span>` : ''}
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'kpis' ? 'active' : ''}" onclick="cambiarTabGestionador('kpis')">
-        📈 6. Métricas (${m.m3ActivosPlanta} m³)
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'kpis' ? 'active' : ''}" onclick="cambiarTabGestionador('kpis')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span>Métricas</span>
       </button>
-      <button class="tab-btn ${AppState.activeTabGestionador === 'solicitar' ? 'active' : ''}" onclick="cambiarTabGestionador('solicitar')">
-        ➕ 7. Solicitar (Admin)
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'solicitar' ? 'active' : ''}" onclick="cambiarTabGestionador('solicitar')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
+        <span>Nueva Solicitud</span>
       </button>
     </div>
 
+    <!-- Tira de Indicadores Compacta (Stat Strip de una sola línea) -->
+    <div class="stat-strip">
+      <div class="stat-chip">
+        <span class="stat-num ${m.solicitados > 0 ? 'text-sky-400' : 'text-slate-500'}">${m.solicitados}</span>
+        <span class="stat-label ${m.solicitados > 0 ? 'text-slate-300' : 'text-slate-500'}">Nuevos Pedidos</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${m.programados > 0 ? 'text-sky-400' : 'text-slate-500'}">${m.programados}</span>
+        <span class="stat-label ${m.programados > 0 ? 'text-slate-300' : 'text-slate-500'}">Programados</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${m.activosPlanta > 0 ? 'text-emerald-400' : 'text-slate-500'}">${m.activosPlanta}</span>
+        <span class="stat-label ${m.activosPlanta > 0 ? 'text-slate-300' : 'text-slate-500'}">Activos en Planta</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${m.enAlquiler > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}">${m.enAlquiler}</span>
+        <span class="stat-label ${m.enAlquiler > 0 ? 'text-amber-300' : 'text-slate-500'}">En Alquiler (>30d)</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${deshabilitadosHSECount > 0 ? 'text-rose-500 font-bold' : 'text-slate-500'}">${deshabilitadosHSECount}</span>
+        <span class="stat-label ${deshabilitadosHSECount > 0 ? 'text-rose-400' : 'text-slate-500'}">Deshabilitados HSE ⛔</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${m.desarmesPendientes > 0 ? 'text-amber-500' : 'text-slate-500'}">${m.desarmesPendientes}</span>
+        <span class="stat-label ${m.desarmesPendientes > 0 ? 'text-slate-300' : 'text-slate-500'}">Desarmes Pendientes</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-num ${m.m3ActivosPlanta > 0 ? 'text-sky-400' : 'text-slate-500'}">${m.m3ActivosPlanta} m³</span>
+        <span class="stat-label ${m.m3ActivosPlanta > 0 ? 'text-slate-300' : 'text-slate-500'}">Volumen Activo</span>
+      </div>
+    </div>
+
+    <!-- Contenido Dinámico de la Pestaña Activa -->
     <div id="tabContentGestionador"></div>
   `;
 
@@ -2072,94 +2107,57 @@ function renderVistaSemanalGestionador(container) {
     `<span class="status-badge" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem;">SEMANA OFFSET (${AppState.semanaOffset > 0 ? '+' : ''}${AppState.semanaOffset})</span>`;
 
   container.innerHTML = `
-    <!-- Barra Superior y Métricas de la Semana Operativa en Tarjeta Única -->
-    <div class="info-card" style="margin-bottom: 0.65rem; padding: 0.6rem 0.85rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-            <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">📅 Vista Semanal Operativa (Miércoles a Martes)</h3>
-            ${badgeEstadoSemana}
-          </div>
-          <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0.15rem 0 0 0;">
-            Ciclo Oficial ARAUCO: <strong>${rangoTexto}</strong> · Programación & Vencimientos
-          </p>
-        </div>
-
-        <!-- Controles de Navegación Temporal -->
-        <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(-1)" title="Semana anterior" style="padding: 0.2rem 0.45rem; font-size: 0.78rem;">
-            ◀ Anterior
-          </button>
-          <button class="btn btn-sm ${AppState.semanaOffset === 0 ? 'btn-outline' : ''}" style="${AppState.semanaOffset === 0 ? 'border-color: #10b981; color: #10b981;' : 'background: #10b981; color: #fff;'} padding: 0.2rem 0.45rem; font-size: 0.78rem;" onclick="irSemanaActual()" title="Semana actual">
-            🔄 Actual
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="navegarSemana(1)" title="Próxima semana" style="padding: 0.2rem 0.45rem; font-size: 0.78rem;">
-            Siguiente ▶
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="window.print()" style="margin-left: 0.2rem; padding: 0.2rem 0.45rem; font-size: 0.78rem;" title="Imprimir programa">
-            🖨️
-          </button>
+    <!-- Barra de Herramientas Unificada (Fechas + Filtros + Buscador + Segmented Control) -->
+    <div class="toolbar-unified">
+      <!-- Izquierda: Indicador compacto del ciclo y navegación -->
+      <div class="toolbar-left">
+        <span class="ciclo-text">
+          Ciclo: <strong>Mié ${fIniParts[2]}/${fIniParts[1]}</strong> al <strong>Mar ${fFinParts[2]}/${fFinParts[1]}</strong>
+        </span>
+        <div class="btn-group-nav">
+          <button class="btn-nav-compact" onclick="navegarSemana(-1)" title="Ciclo anterior">◀</button>
+          <button class="btn-nav-compact ${AppState.semanaOffset === 0 ? 'btn-nav-current' : ''}" onclick="irSemanaActual()" title="Ciclo actual">Hoy</button>
+          <button class="btn-nav-compact" onclick="navegarSemana(1)" title="Ciclo siguiente">▶</button>
+          <button class="btn-nav-compact" onclick="window.print()" title="Imprimir programación">🖨️</button>
         </div>
       </div>
 
-      <!-- Filtros Rápidos de la Semana -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.4rem;">
-        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-          <label style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); margin: 0;">Empresa:</label>
-          <select id="filtroEmpresaSemanal" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: auto;" onchange="cambiarFiltroEmpresaSemanal(this.value)">
-            <option value="TODAS" ${AppState.filtroEmpresaSemanal === 'TODAS' ? 'selected' : ''}>Todas las Empresas</option>
-            <option value="Andamios del Sur S.A." ${AppState.filtroEmpresaSemanal === 'Andamios del Sur S.A.' ? 'selected' : ''}>Andamios del Sur S.A.</option>
-            <option value="Montajes Industriales S.A." ${AppState.filtroEmpresaSemanal === 'Montajes Industriales S.A.' ? 'selected' : ''}>Montajes Industriales S.A.</option>
-          </select>
+      <!-- Centro: Selectores compactos y Buscador de andamios -->
+      <div class="toolbar-center">
+        <select id="filtroEmpresaSemanal" class="select-compact" onchange="cambiarFiltroEmpresaSemanal(this.value)">
+          <option value="TODAS" ${AppState.filtroEmpresaSemanal === 'TODAS' ? 'selected' : ''}>Todas las Empresas</option>
+          <option value="Andamios del Sur S.A." ${AppState.filtroEmpresaSemanal === 'Andamios del Sur S.A.' ? 'selected' : ''}>Andamios del Sur S.A.</option>
+          <option value="Montajes Industriales S.A." ${AppState.filtroEmpresaSemanal === 'Montajes Industriales S.A.' ? 'selected' : ''}>Montajes Industriales S.A.</option>
+        </select>
 
-          <label style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); margin: 0 0 0 0.3rem;">Evento:</label>
-          <select id="filtroEventoSemanal" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: auto;" onchange="cambiarFiltroEventoSemanal(this.value)">
-            <option value="TODOS" ${AppState.filtroEventoSemanal === 'TODOS' ? 'selected' : ''}>Todos los Eventos</option>
-            <option value="PROGRAMADO" ${AppState.filtroEventoSemanal === 'PROGRAMADO' ? 'selected' : ''}>🔵 Programados</option>
-            <option value="HABILITADO" ${AppState.filtroEventoSemanal === 'HABILITADO' ? 'selected' : ''}>🟢 Habilitados</option>
-            <option value="DESARME" ${AppState.filtroEventoSemanal === 'DESARME' ? 'selected' : ''}>🔴 Desarmes</option>
-            <option value="ALQUILER" ${AppState.filtroEventoSemanal === 'ALQUILER' ? 'selected' : ''}>🟡 Alertas 30d</option>
-          </select>
-        </div>
+        <select id="filtroEventoSemanal" class="select-compact" onchange="cambiarFiltroEventoSemanal(this.value)">
+          <option value="TODOS" ${AppState.filtroEventoSemanal === 'TODOS' ? 'selected' : ''}>Todos los Eventos</option>
+          <option value="PROGRAMADO" ${AppState.filtroEventoSemanal === 'PROGRAMADO' ? 'selected' : ''}>🔵 Programados</option>
+          <option value="HABILITADO" ${AppState.filtroEventoSemanal === 'HABILITADO' ? 'selected' : ''}>🟢 Habilitados</option>
+          <option value="DESARME" ${AppState.filtroEventoSemanal === 'DESARME' ? 'selected' : ''}>🔴 Desarmes</option>
+          <option value="ALQUILER" ${AppState.filtroEventoSemanal === 'ALQUILER' ? 'selected' : ''}>🟡 Alertas 30d</option>
+        </select>
 
-        <div style="display: flex; gap: 0.3rem; align-items: center;">
-          <input type="text" id="busquedaSemanalInput" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal}" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; width: 190px;" oninput="handleBusquedaSemanalInput(this.value)">
-          ${AppState.busquedaSemanal ? `<button class="btn btn-outline btn-sm" onclick="limpiarBusquedaSemanal()" style="padding: 0.15rem 0.35rem;">✖</button>` : ''}
+        <div class="search-input-wrapper">
+          <input type="text" id="busquedaSemanalInput" class="input-search-compact" placeholder="Buscar andamio, ubicación..." value="${AppState.busquedaSemanal || ''}" oninput="handleBusquedaSemanalInput(this.value)">
+          ${AppState.busquedaSemanal ? `<button class="btn-clear-search" onclick="limpiarBusquedaSemanal()">✕</button>` : ''}
         </div>
       </div>
 
-      <!-- KPIs de la Semana Operativa en la Fila Inferior de la Tarjeta -->
-      <div class="header-kpis-grid" style="margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1px solid var(--border);">
-        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
-          <div class="calc-val" style="color: #38bdf8; font-size: 1.15rem;">${totalEventosSemana}</div>
-          <div class="calc-label">Movimientos Ciclo</div>
-        </div>
-        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
-          <div class="calc-val" style="color: #10b981; font-size: 1.15rem;">${andamiosActivosSemana.length}</div>
-          <div class="calc-label">${m3TotalActivoSemana.toFixed(1)} m³ · ${m2TotalActivoSemana.toFixed(1)} m²</div>
-        </div>
-        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
-          <div class="calc-val" style="color: #f59e0b; font-size: 1.15rem;">${andamiosEnAlquilerSemana.length}</div>
-          <div class="calc-label">En Alquiler (>30d)</div>
-        </div>
-        <div class="calc-box-compact" style="padding: 0.3rem 0.45rem;">
-          <div class="calc-val" style="color: #ef4444; font-size: 1.15rem;">${desarmesSemana.length}</div>
-          <div class="calc-label">Desarmes en Proceso</div>
+      <!-- Derecha: Segmented Control de Sub-vistas (Sin numeración) -->
+      <div class="toolbar-right">
+        <div class="segmented-control">
+          <button class="segmented-item ${AppState.subTabSemanal === 'tablero' ? 'active' : ''}" onclick="cambiarSubTabSemanal('tablero')">
+            Tablero 7 Días
+          </button>
+          <button class="segmented-item ${AppState.subTabSemanal === 'activos' ? 'active' : ''}" onclick="cambiarSubTabSemanal('activos')">
+            Parque Semanal (${andamiosActivosSemana.length})
+          </button>
+          <button class="segmented-item ${AppState.subTabSemanal === 'contratistas' ? 'active' : ''}" onclick="cambiarSubTabSemanal('contratistas')">
+            Por Contratista
+          </button>
         </div>
       </div>
-    </div>
-
-    <!-- Selector de Sub-pestañas Semanales -->
-    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.65rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; flex-wrap: wrap;">
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'tablero' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('tablero')" style="${AppState.subTabSemanal === 'tablero' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-        📅 1. Tablero Diario (7 Días)
-      </button>
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'activos' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('activos')" style="${AppState.subTabSemanal === 'activos' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-        🏗️ 2. Parque Activo en la Semana (${andamiosActivosSemana.length})
-      </button>
-      <button class="btn btn-sm ${AppState.subTabSemanal === 'contratistas' ? '' : 'btn-outline'}" onclick="cambiarSubTabSemanal('contratistas')" style="${AppState.subTabSemanal === 'contratistas' ? 'background: #0284c7; color: #fff;' : ''} padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-        📊 3. Resumen Consolidado por Contratista
-      </button>
     </div>
 
     <!-- Contenido de la Sub-Pestaña Activa -->
@@ -2173,77 +2171,95 @@ function renderVistaSemanalGestionador(container) {
 
 function renderTablero7Dias(eventosPorDia) {
   return `
-    <div class="semana-grid-7">
+    <div class="kanban-container-clean">
       ${eventosPorDia.map(epd => {
         const d = epd.dia;
         const total = epd.eventos.length;
+        const colClass = total === 0 ? 'kanban-col-empty' : 'kanban-col-active';
+
         return `
-          <div class="dia-columna ${d.esHoy ? 'hoy' : ''} ${d.esFinDeSemana ? 'finde' : ''}">
-            <div class="dia-header">
-              <div style="font-weight: 800; font-size: 0.88rem; color: ${d.esHoy ? '#10b981' : '#fff'}; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
-                <span>${d.nombreDia}</span>
-                ${d.esHoy ? `<span class="badge" style="background: #10b981; color: #000; font-size: 0.65rem; padding: 1px 4px; font-weight: 900;">HOY</span>` : ''}
+          <div class="kanban-col ${colClass}" style="${d.esHoy ? 'border-color: rgba(16, 185, 129, 0.6);' : ''}">
+            <div class="kanban-col-header" style="${d.esHoy ? 'background: rgba(16, 185, 129, 0.15);' : ''}">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                <span style="font-weight: 700; font-size: 0.82rem; color: ${d.esHoy ? '#34d399' : '#f1f5f9'};">
+                  ${d.nombreDia}
+                </span>
+                ${d.esHoy ? `<span style="background: #10b981; color: #020617; font-size: 0.6rem; padding: 1px 4px; font-weight: 900; border-radius: 3px;">HOY</span>` : ''}
               </div>
-              <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+              <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 1px;">
                 ${d.diaNum}/${d.mesNum < 10 ? '0' + d.mesNum : d.mesNum}
               </div>
-              <div style="margin-top: 4px;">
-                <span class="badge" style="font-size: 0.68rem; background: ${total > 0 ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)'}; color: ${total > 0 ? '#38bdf8' : 'var(--text-muted)'};">
+              <div style="margin-top: 3px;">
+                <span class="pill-badge ${total > 0 ? 'pill-active' : ''}" style="font-size: 0.65rem;">
                   ${total} ${total === 1 ? 'evento' : 'eventos'}
                 </span>
               </div>
             </div>
 
-            <div class="dia-body">
+            <div class="kanban-col-body">
               ${total === 0 ? `
-                <div style="text-align: center; padding: 1.5rem 0.5rem; color: var(--text-muted); font-size: 0.74rem;">
+                <div style="text-align: center; padding: 1.5rem 0.25rem; color: #64748b; font-size: 0.72rem; font-style: italic;">
                   Sin movimientos
                 </div>
               ` : `
                 ${epd.eventos.map(ev => {
                   const s = ev.solicitud;
+
+                  // Configuración de Dot y Estado simplificado
+                  let dotClass = 'dot-blue';
+                  let estadoTexto = 'MONTAJE';
+                  if (ev.tipo === 'HABILITACION' || s.estado === 'HABILITADO') {
+                    dotClass = 'dot-green';
+                    estadoTexto = 'HABILITADO';
+                  } else if (ev.tipo === 'DESARME' || s.estado === 'DESARME_SOLICITADO') {
+                    dotClass = 'dot-rose';
+                    estadoTexto = 'DESARME';
+                  } else if (ev.tipo === 'ALQUILER' || s.estado === 'EN_ALQUILER') {
+                    dotClass = 'dot-amber';
+                    estadoTexto = 'ALQUILER >30D';
+                  } else if (s.estado === 'DESHABILITADO_HSE') {
+                    dotClass = 'dot-rose';
+                    estadoTexto = 'BLOQUEO HSE';
+                  }
+
+                  const vol = ev.vol || s.totalVolumenRealM3 || s.dimSolicitadaAndamio?.volumenM3 || 0;
+                  const provNombre = (s.proveedorAsignado || 'Sin Asignar').replace(' S.A.', '').replace(' Industriales', '');
+
                   return `
-                    <div class="evento-card-semanal ${ev.clase}">
-                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
-                        <span style="font-size: 0.68rem; font-weight: 800; text-transform: uppercase;">
-                          ${ev.tipoLabel}
+                    <div class="card-andamio-clean ${ev.clase}" title="Tarjeta: ${s.tarjetaId || 'S/N'} · ${s.proveedorAsignado || ''} · ${vol} m³">
+                      <!-- Línea 1: Badge compacto de estado (punto de color + texto) y volumen -->
+                      <div class="card-line-1">
+                        <span class="status-dot-badge">
+                          <span class="status-dot ${dotClass}"></span>
+                          <span style="color: #cbd5e1;">${estadoTexto}</span>
                         </span>
-                        <small style="color: var(--arauco-accent); font-weight: 700;">${s.tarjetaId || ''}</small>
+                        <span style="font-size: 0.7rem; color: #38bdf8; font-weight: 700;">${vol} m³</span>
                       </div>
 
-                      <div style="font-weight: 700; color: #fff; font-size: 0.82rem; margin-bottom: 2px;">
-                        ${s.numeroCorrelativo}
+                      <!-- Línea 2: Código del andamio en fuente monoespaciada clara -->
+                      <div class="card-line-2">
+                        <span class="font-mono font-bold text-sm text-white" style="letter-spacing: 0.02em;">
+                          ${s.numeroCorrelativo}
+                        </span>
                       </div>
 
-                      <div style="font-size: 0.75rem; color: #e2e8f0; margin-bottom: 3px; line-height: 1.2;" title="${s.ubicacionTecnica}">
-                        📍 <strong>${s.ubicacionTecnica}</strong>
+                      <!-- Línea 3: Ubicación/Equipo con ícono sutil y truncate limpio -->
+                      <div class="card-line-3" title="${s.ubicacionTecnica}">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.74rem; color: #cbd5e1; font-weight: 500;">
+                          📍 ${s.ubicacionTecnica}
+                        </span>
                       </div>
 
-                      <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">
-                        🏢 ${s.proveedorAsignado || 'Sin empresa'}
-                      </div>
-
-                      <div style="background: rgba(255,255,255,0.04); padding: 3px 6px; border-radius: 4px; display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 5px;">
-                        <span style="color: #38bdf8; font-weight: 700;">${ev.vol} m³</span>
-                        <span style="color: #4ade80; font-weight: 700;">${ev.sup} m²</span>
-                      </div>
-
-                      ${s.fotoAndamioMontado ? `
-                        <div style="margin-bottom: 5px;">
-                          <img src="${s.fotoAndamioMontado}" alt="Foto Andamio" style="width: 100%; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #334155; cursor: pointer;" onclick="window.open('${s.fotoAndamioMontado}', '_blank')" title="Ver foto de terreno">
+                      <!-- Sub-info y Acciones compactas -->
+                      <div class="card-line-footer">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.68rem; color: #94a3b8; max-width: 60%;" title="${s.proveedorAsignado || ''}">
+                          ${provNombre}
+                        </span>
+                        <div class="card-actions-subtle">
+                          <button class="btn-card-action" onclick="imprimirPlanillaOficialARAUCO('${s.id}')" title="Ver Planilla Oficial">📄</button>
+                          <button class="btn-card-action" onclick="imprimirTarjetaHabilitacionPorId('${s.id}')" title="Ver Tarjeta QR">🏷️</button>
+                          <button class="btn-card-action" onclick="window.open('/verificar.html?id=' + encodeURIComponent('${s.numeroCorrelativo}'), '_blank')" title="Auditoría Web">🌐</button>
                         </div>
-                      ` : ''}
-
-                      <div style="display: flex; gap: 0.25rem; justify-content: flex-end; margin-top: 4px;">
-                        <button class="btn btn-outline btn-sm" style="padding: 0.15rem 0.35rem; font-size: 0.68rem;" onclick="imprimirPlanillaOficialARAUCO('${s.id}')" title="Ver e imprimir Planilla Oficial">
-                          📄
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="padding: 0.15rem 0.35rem; font-size: 0.68rem;" onclick="imprimirTarjetaHabilitacionPorId('${s.id}')" title="Ver Tarjeta QR">
-                          🏷️
-                        </button>
-                        <button class="btn btn-outline btn-sm" style="padding: 0.15rem 0.35rem; font-size: 0.68rem;" onclick="window.open('/verificar.html?id=' + encodeURIComponent('${s.numeroCorrelativo}'), '_blank')" title="Auditoría Web">
-                          🌐
-                        </button>
                       </div>
                     </div>
                   `;
