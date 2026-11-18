@@ -132,43 +132,53 @@ function actualizarUserBar() {
   }
 
   userBar.style.display = 'flex';
-  const rol = AppState.currentUser.rol;
-  roleBadge.textContent = rol === 'SOLICITANTE' ? 'SOLICITANTE' :
-    rol === 'GESTIONADOR' ? 'ADMIN GESTIONADOR' : 'EMPRESA EJECUTORA';
-
-  roleBadge.className = 'role-badge ' + (
-    rol === 'SOLICITANTE' ? 'solicitante' :
-      rol === 'GESTIONADOR' ? 'gestionador' : 'ejecutante'
-  );
-
-  const subInfo = AppState.currentUser.sector || AppState.currentUser.empresaNombre || '';
-  userName.innerHTML = `${AppState.currentUser.nombre} <small style="opacity: 0.7; font-weight: normal; margin-left: 4px;">(${subInfo})</small>`;
-
-  // Botón para alternar a Modo Solicitante si es Admin / Gestionador
+  const esHSE = (AppState.currentUser.email === 'auditor.hse@arauco.com') || (AppState.currentUser.sector && AppState.currentUser.sector.includes('HSE'));
+  const btnClave = document.getElementById('btnCambiarClave');
   let btnToggle = document.getElementById('btnToggleModoAdmin');
-  if (rol === 'GESTIONADOR') {
-    if (!btnToggle) {
-      btnToggle = document.createElement('button');
-      btnToggle.id = 'btnToggleModoAdmin';
-      btnToggle.className = 'btn btn-outline';
-      btnToggle.style.cssText = 'font-size: 0.8rem; padding: 0.35rem 0.65rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;';
-      userBar.insertBefore(btnToggle, btnLogout);
-    }
-    btnToggle.style.display = 'inline-flex';
-    if (AppState.adminViewMode === 'SOLICITANTE') {
-      btnToggle.innerHTML = '🛡️ Volver a Centro de Control';
-      btnToggle.title = 'Regresar al Panel de Gestión General';
-    } else {
-      btnToggle.innerHTML = '📝 Modo Solicitante';
-      btnToggle.title = 'Operar como solicitante para cargar pedidos propios o planillas masivas';
-    }
-    btnToggle.onclick = () => {
-      AppState.adminViewMode = AppState.adminViewMode === 'SOLICITANTE' ? 'GESTIONADOR' : 'SOLICITANTE';
-      actualizarUserBar();
-      renderPortalPorRol();
-    };
-  } else {
+
+  if (esHSE) {
+    roleBadge.textContent = '🦺 SEGURIDAD HSE';
+    roleBadge.className = 'role-badge';
+    roleBadge.style.cssText = 'background: #dc2626; color: #fff; font-weight: 800;';
     if (btnToggle) btnToggle.style.display = 'none';
+    if (btnClave) btnClave.style.display = 'none';
+  } else {
+    if (btnClave) btnClave.style.display = 'inline-block';
+    const rol = AppState.currentUser.rol;
+    roleBadge.textContent = rol === 'SOLICITANTE' ? 'SOLICITANTE' :
+      rol === 'GESTIONADOR' ? 'ADMIN GESTIONADOR' : 'EMPRESA EJECUTORA';
+
+    roleBadge.className = 'role-badge ' + (
+      rol === 'SOLICITANTE' ? 'solicitante' :
+        rol === 'GESTIONADOR' ? 'gestionador' : 'ejecutante'
+    );
+    roleBadge.style.cssText = '';
+
+    // Botón para alternar a Modo Solicitante si es Admin / Gestionador
+    if (rol === 'GESTIONADOR') {
+      if (!btnToggle) {
+        btnToggle = document.createElement('button');
+        btnToggle.id = 'btnToggleModoAdmin';
+        btnToggle.className = 'btn btn-outline';
+        btnToggle.style.cssText = 'font-size: 0.8rem; padding: 0.35rem 0.65rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;';
+        userBar.insertBefore(btnToggle, btnLogout);
+      }
+      btnToggle.style.display = 'inline-flex';
+      if (AppState.adminViewMode === 'SOLICITANTE') {
+        btnToggle.innerHTML = '🛡️ Volver a Centro de Control';
+        btnToggle.title = 'Regresar al Panel de Gestión General';
+      } else {
+        btnToggle.innerHTML = '📝 Modo Solicitante';
+        btnToggle.title = 'Operar como solicitante para cargar pedidos propios o planillas masivas';
+      }
+      btnToggle.onclick = () => {
+        AppState.adminViewMode = AppState.adminViewMode === 'SOLICITANTE' ? 'GESTIONADOR' : 'SOLICITANTE';
+        actualizarUserBar();
+        renderPortalPorRol();
+      };
+    } else {
+      if (btnToggle) btnToggle.style.display = 'none';
+    }
   }
 
   btnLogout.onclick = () => {
@@ -1802,15 +1812,16 @@ async function renderPortalGestionador(container, user) {
   const deshabilitadosHSECount = todas.filter(s => s.estado === 'DESHABILITADO_HSE').length;
   const esHSE = (user.email === 'auditor.hse@arauco.com') || (user.sector && user.sector.includes('HSE'));
 
-  if (esHSE && (!AppState.activeTabGestionador || AppState.activeTabGestionador === 'semanal')) {
-    AppState.activeTabGestionador = 'auditoria';
+  if (esHSE) {
+    // Para el perfil de Seguridad e Higiene: Vista directa, limpia y 100% enfocada
+    // Se eliminan la caja superior redundante de pedidos/desarmes y las 7 pestañas ajenas a HSE
+    renderAuditoriaGestionador(container);
+    return;
   }
 
-  const tituloPortal = esHSE ? '🦺 Centro de Control de Seguridad & Higiene (HSE)' : '🛡️ Centro de Control del Gestionador';
-  const badgeRol = esHSE ? 'Seguridad HSE ARAUCO' : 'Admin ARAUCO';
-  const subTituloPortal = esHSE ?
-    `Auditor HSE: <strong>${user.nombre}</strong> | Inspección en Terreno & Control de Condiciones Seguras de Andamios` :
-    `Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación`;
+  const tituloPortal = '🛡️ Centro de Control del Gestionador';
+  const badgeRol = 'Admin ARAUCO';
+  const subTituloPortal = `Supervisor: <strong>${user.nombre}</strong> | Planta Industrial ARAUCO | Control de Metraje & Certificación`;
 
   container.innerHTML = `
     <div class="info-card dashboard-hero">
