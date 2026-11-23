@@ -1,0 +1,34 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Ejecuta cada 4 días a las 12:00 UTC para evitar la pausa tras 7 días de inactividad
+    - cron: '0 12 */4 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase REST API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar secretos requeridos
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "Error: Debes configurar los secrets SUPABASE_URL y SUPABASE_KEY en GitHub."
+            exit 1
+          fi
+
+      - name: Consultar tabla solicitudes en Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          BASE_URL="${SUPABASE_URL%/}"
+          curl -f -sS "${BASE_URL}/rest/v1/solicitudes?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -o /dev/null
+          echo "Ping exitoso a Supabase."

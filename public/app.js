@@ -218,36 +218,26 @@ function actualizarUserBar() {
 /* ========================================================
    VISTA DE LOGIN CON AUTENTICACIÓN SEGURA Y CONTRASEÑAS
    ======================================================== */
-const DIRECTORIO_CREDENCIALES = [
-  { rolLabel: '🛡️ Admin General ARAUCO', sub: 'Diego A. Cristaldo (Supervisión)', email: 'diego.a.cristaldo@arauco.com', pass: 'Arauco!2026' },
-  { rolLabel: '🛡️ Gestionador ARAUCO', sub: 'Ing. Marcelo Rossi (Supervisión Planta)', email: 'marcelo.rossi@arauco.com', pass: 'Arauco!2026' },
-  { rolLabel: '👤 Solicitante Mantenimiento', sub: 'Juan Pérez (Taller Central)', email: 'juan.perez@arauco.com', pass: 'Arauco!2026' },
-  { rolLabel: '👤 Solicitante Producción', sub: 'Carlos Gómez (Línea de Fibra)', email: 'carlos.gomez@arauco.com', pass: 'Arauco!2026' },
-  { rolLabel: '👷 Contratista Andamios Sur', sub: 'Andamios del Sur S.A. (Supervisor)', email: 'supervisor@andamiosdelsur.com', pass: 'Arauco!2026' },
-  { rolLabel: '👷 Contratista Montajes', sub: 'Montajes Industriales S.A. (Supervisor)', email: 'operaciones@montajesind.com', pass: 'Arauco!2026' },
-  { rolLabel: '🦺 Seguridad HSE ARAUCO', sub: 'Lic. Roberto Varela (Auditoría)', email: 'auditor.hse@arauco.com', pass: 'Arauco!2026' }
-];
-
 function renderLogin() {
   const container = document.getElementById('appContainer');
   if (!container) return;
 
   container.innerHTML = `
-    <div class="auth-wrapper" style="max-width: 580px; margin: 2rem auto;">
-      <div class="auth-header" style="text-align: center; margin-bottom: 1.5rem;">
-        <span class="brand-badge" style="font-size: 1.6rem; letter-spacing: 2px;">arauco</span>
-        <h2 style="margin-top: 1rem; font-size: 1.35rem; color: #fff;">Acceso Seguro al Sistema</h2>
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">
+    <div class="auth-wrapper">
+      <div class="auth-header">
+        <span class="brand-badge auth-brand-badge">arauco</span>
+        <h2 class="auth-title">Acceso Seguro al Sistema</h2>
+        <p class="auth-subtitle">
           Gestión de Provisión de Andamios · Control de Acceso por Perfil y Contraseña
         </p>
       </div>
 
       <!-- Selector de Modo: Iniciar Sesión / Registrar Nuevo Usuario -->
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; background: rgba(15, 23, 42, 0.7); padding: 5px; border-radius: 8px; border: 1px solid var(--border);">
-        <button type="button" id="tabBtnLogin" onclick="cambiarAuthTab('login')" class="btn" style="flex: 1; justify-content: center; font-size: 0.88rem; padding: 0.55rem; font-weight: 700;">
+      <div class="auth-tabs">
+        <button type="button" id="tabBtnLogin" onclick="cambiarAuthTab('login')" class="btn auth-tab-btn">
           🔐 Iniciar Sesión
         </button>
-        <button type="button" id="tabBtnRegistro" onclick="cambiarAuthTab('registro')" class="btn btn-outline" style="flex: 1; justify-content: center; font-size: 0.88rem; padding: 0.55rem; font-weight: 700;">
+        <button type="button" id="tabBtnRegistro" onclick="cambiarAuthTab('registro')" class="btn btn-outline auth-tab-btn">
           📝 Registrar Nuevo Usuario
         </button>
       </div>
@@ -257,35 +247,32 @@ function renderLogin() {
         <!-- Alerta de Error de Inicio de Sesión -->
         <div id="loginErrorAlert" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #fca5a5;"></div>
 
-        <form id="formLogin" onsubmit="handleLoginSubmit(event)" style="background: var(--bg-card); padding: 1.5rem; border-radius: 10px; border: 1px solid var(--border);">
+        <form id="formLogin" class="auth-card" onsubmit="handleLoginSubmit(event)">
           <div class="form-group" style="margin-bottom: 1rem;">
             <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
               Correo Electrónico Corporativo
             </label>
-            <input type="email" id="loginEmail" placeholder="usuario@arauco.com" required value="diego.a.cristaldo@arauco.com" style="width: 100%; padding: 0.65rem 0.8rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;">
+            <input type="email" id="loginEmail" placeholder="usuario@arauco.com" required value="diego.a.cristaldo@arauco.com" class="auth-input">
           </div>
 
           <div class="form-group" style="margin-bottom: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-              <label style="font-size: 0.85rem; font-weight: 600;">Contraseña Individual</label>
+              <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0;">Contraseña Individual</label>
               <button type="button" onclick="togglePasswordVisibility()" style="background: none; border: none; color: var(--arauco-accent); font-size: 0.78rem; cursor: pointer;">
                 <span id="passToggleIcon">👁️ Mostrar</span>
               </button>
             </div>
             <div style="position: relative;">
-              <input type="password" id="loginPassword" value="Arauco!2026" placeholder="Ingrese su contraseña..." required style="width: 100%; padding: 0.65rem 0.8rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff;">
+              <input type="password" id="loginPassword" value="Arauco!2026" placeholder="Ingrese su contraseña..." required class="auth-input">
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.35rem;">
-              <small id="loginHelpText" style="color: var(--text-muted); font-size: 0.75rem;">
-                Contraseña por defecto para pruebas: <code>Arauco!2026</code>
-              </small>
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 0.45rem;">
               <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" style="font-size: 0.78rem; color: var(--arauco-accent); text-decoration: underline;">
                 ¿Olvidó su contraseña?
               </a>
             </div>
           </div>
 
-          <button type="submit" id="btnSubmitLogin" class="btn" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.95rem; font-weight: 700; background: var(--arauco-green-light); border: none; cursor: pointer;">
+          <button type="submit" id="btnSubmitLogin" class="btn auth-submit-btn">
             🔐 Iniciar Sesión con Credenciales
           </button>
 
@@ -296,44 +283,6 @@ function renderLogin() {
             </a>
           </div>
         </form>
-
-        <!-- Acordeón Desplegable con Directorio de Credenciales para Pruebas -->
-        <details style="margin-top: 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem;">
-          <summary style="font-size: 0.82rem; font-weight: 600; color: var(--arauco-accent); cursor: pointer; user-select: none;">
-            📋 Tabla Resumen de Credenciales de Prueba (Clic para desplegar)
-          </summary>
-          <div style="margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
-            <p style="margin-bottom: 0.5rem;">Todas las cuentas de prueba están configuradas con la clave <code>Arauco!2026</code>:</p>
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                <thead>
-                  <tr style="border-bottom: 1px solid var(--border); color: #fff;">
-                    <th style="padding: 0.4rem;">Perfil / Cargo</th>
-                    <th style="padding: 0.4rem;">Correo Electrónico</th>
-                    <th style="padding: 0.4rem;">Contraseña</th>
-                    <th style="padding: 0.4rem; text-align: right;">Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${DIRECTORIO_CREDENCIALES.map(c => `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                      <td style="padding: 0.4rem; color: #fff;">
-                        <strong>${c.rolLabel}</strong><br><small style="color: var(--text-muted);">${c.sub}</small>
-                      </td>
-                      <td style="padding: 0.4rem; font-family: monospace; color: #93c5fd;">${c.email}</td>
-                      <td style="padding: 0.4rem; font-family: monospace; color: #86efac; font-weight: bold;">${c.pass}</td>
-                      <td style="padding: 0.4rem; text-align: right;">
-                        <button type="button" class="btn btn-outline btn-sm" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;" onclick="autocompletarCredenciales('${c.email}', '${c.pass}')">
-                          Usar
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </details>
       </div>
 
       <!-- SECCIÓN 2: REGISTRO DE USUARIO NUEVO (SOLICITANTE MTO / SOLICITANTE PROD / EJECUTOR EESS) -->
