@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin Exclusivo - Andamios ARAUCO</title>
+  <meta name="theme-color" content="#1b4332">
+  <link rel="stylesheet" href="/styles.css?v=1.1.5">
+</head>
+<body>
+
+  <header class="navbar-h14">
+    <div class="brand-compact">
+      <span class="brand-badge">arauco</span>
+      <div class="brand-text-group">
+        <span class="brand-title-compact">Panel Admin Exclusivo</span>
+        <span class="brand-sub-inline">Usuarios · Claves · Uso de la App</span>
+      </div>
+    </div>
+
+    <div class="navbar-actions">
+      <a href="/" class="btn btn-outline btn-sm" style="text-decoration: none;">
+        ← Volver a la App
+      </a>
+      <button type="button" id="btnAdminLogout" onclick="cerrarSesionAdmin()" class="btn btn-danger btn-sm" style="display: none;">
+        🔒 Cerrar Sesión
+      </button>
+    </div>
+  </header>
+
+  <main id="adminContainer" style="max-width: 1200px; width: 100%; margin: 0 auto; padding: 1.25rem 1rem;">
+    <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+      Cargando Panel Admin...
+    </div>
+  </main>
+
+  <script>
+    const TOKEN_KEY = 'arauco_admin_token';
+
+    function getAdminToken() {
+      return sessionStorage.getItem(TOKEN_KEY) || '';
+    }
+
+    function setAdminToken(token) {
+      if (token) sessionStorage.setItem(TOKEN_KEY, token);
+      else sessionStorage.removeItem(TOKEN_KEY);
+    }
+
+    async function initAdminPage() {
+      const token = getAdminToken();
+      const btnLogout = document.getElementById('btnAdminLogout');
+      if (!token) {
+        if (btnLogout) btnLogout.style.display = 'none';
+        renderAdminLogin();
+        return;
+      }
+      if (btnLogout) btnLogout.style.display = 'inline-flex';
+      await renderAdminDashboard();
+    }
+
+    function renderAdminLogin(errorMsg = '') {
+      const container = document.getElementById('adminContainer');
+      container.innerHTML = `
+        <div class="auth-wrapper" style="max-width: 440px; margin: 2rem auto;">
+          <div class="auth-header">
+            <span class="brand-badge auth-brand-badge">arauco</span>
+            <h2 class="auth-title">Acceso Exclusivo Admin</h2>
+            <p class="auth-subtitle">
+              Panel restringido únicamente a la cuenta principal <strong>Diego2026</strong>.
+            </p>
+          </div>
+
+          <div id="adminLoginError" style="display: ${errorMsg ? 'block' : 'none'}; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #fca5a5;">
+            ${errorMsg}
+          </div>
+
+          <form onsubmit="handleAdminLogin(event)" class="auth-card">
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
+                Correo Administrador
+              </label>
+              <input type="email" id="adminEmail" required placeholder="diego2026@arauco.com" class="auth-input" autocomplete="username">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0;">Contraseña</label>
+                <button type="button" onclick="toggleAdminPass()" style="background: none; border: none; color: var(--arauco-accent); font-size: 0.78rem; cursor: pointer;">
+                  <span id="adminPassIcon">👁️ Mostrar</span>
+                </button>
+              </div>
+              <input type="password" id="adminPass" required placeholder="Ingrese su clave..." class="auth-input" autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="btnAdminLogin" class="btn auth-submit-btn">
+              🛡️ Ingresar al Panel Admin
+            </button>
+          </form>
+        </div>
+      `;
+    }
+
+    window.toggleAdminPass = () => {
+      const inp = document.getElementById('adminPass');
+      const icon = document.getElementById('adminPassIcon');
+      if (!inp) return;
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        if (icon) icon.textContent = '🙈 Ocultar';
+      } else {
+        inp.type = 'password';
+        if (icon) icon.textContent = '👁️ Mostrar';
+      }
+    };
+
+    window.handleAdminLogin = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('adminEmail').value.trim();
+      const password = document.getElementById('adminPass').value;
+      const errBox = document.getElementById('adminLoginError');
+      const btn = document.getElementById('btnAdminLogin');
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Verificando...';
+      errBox.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        }).then(r => r.json());
+
+        if (res.ok && res.token) {
+          setAdminToken(res.token);
+          await initAdminPage();
+        } else {
+          errBox.textContent = `⚠️ ${res.error || 'Acceso denegado.'}`;
+          errBox.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = '🛡️ Ingresar al Panel Admin';
+        }
+      } catch {
+        errBox.textContent = '⚠️ Error de conexión con el servidor.';
+        errBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '🛡️ Ingresar al Panel Admin';
+      }
+    };
+
+    window.cerrarSesionAdmin = () => {
+      setAdminToken('');
+      initAdminPage();
+    };
+
+    async function renderAdminDashboard() {
+      const container = document.getElementById('adminContainer');
+      container.innerHTML = `
+        <div class="info-card" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          ⏳ Cargando panel de administración y estadísticas de uso...
+        </div>
+      `;
+
+      try {
+        const resp = await fetch('/api/admin/resumen', {
+          headers: { 'Authorization': `Bearer ${getAdminToken()}` }
+        });
+        if (resp.status === 401 || resp.status === 403) {
+          setAdminToken('');
+          document.getElementById('btnAdminLogout').style.display = 'none';
+          renderAdminLogin('Tu sesión administrativa expiró. Vuelve a iniciar sesión.');
+          return;
+        }
+        const res = await resp.json();
+        if (!res.ok) {
+          container.innerHTML = `<div class="info-card" style="color: #fca5a5;">⚠️ No se pudo cargar el panel Admin.</div>`;
+          return;
+        }
+
+        const { usuarios, usoApp, estadisticas } = res;
+        const fmtFecha = (iso) => {
+          if (!iso) return 'Sin registros';
+          try {
+            return new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+          } catch {
+            return iso;
+          }
+        };
+
+        const rolBadge = (rol) => {
+          if (rol === 'GESTIONADOR') return '<span class="status-badge habilitado">Gestionador</span>';
+          if (rol === 'EMPRESA_SERVICIO') return '<span class="status-badge programado">EESS</span>';
+          return '<span class="status-badge solicitado">Solicitante</span>';
+        };
+
+        container.innerHTML = `
+          <!-- 1. Uso General de la App -->
+          <div class="info-card" style="margin-bottom: 1.25rem;">
+            <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <h3>🛡️ Administración del Sistema y Uso de la App</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">
+                  Control exclusivo de usuarios registrados, reseteo de contraseñas y monitoreo de accesos.
+                </p>
+              </div>
+              <span style="font-size: 0.78rem; padding: 0.3rem 0.65rem; border-radius: 999px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7;">
+                🗄️ BD: ${estadisticas.modoDb}
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem;">
+              <div class="calc-box">
+                <div class="calc-val" style="color: #38bdf8;">${estadisticas.totalUsuarios}</div>
+                <div class="calc-label">Usuarios Registrados</div>
+                <small style="color: var(--text-muted); font-size: 0.72rem;">
+                  ${estadisticas.porRol.GESTIONADOR} Gest. · ${estadisticas.porRol.SOLICITANTE} Solic. · ${estadisticas.porRol.EMPRESA_SERVICIO} EESS
+                </small>
+              </div>
+              <div class="calc-box">
+                <div class="calc-val" style="color: #4ade80;">${usoApp.totalLogins || 0}</div>
+                <div class="calc-label">Inicios de Sesión Totales</div>
+              </div>
+              <div class="calc-box">
+                <div class="calc-val" style="color: #fbbf24;">${estadisticas.totalSolicitudes}</div>
+                <div class="calc-label">Pedidos Totales</div>
+                <small style="color: var(--text-muted); font-size: 0.72rem;">
+                  ${estadisticas.activasEnPlanta} activos · ${estadisticas.desarmadas} desarmados
+                </small>
+              </div>
+              <div class="calc-box">
+                <div class="calc-val" style="color: #c084fc;">${estadisticas.totalEmpresas}</div>
+                <div class="calc-label">EESS Habilitadas</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Gestión de Usuarios y Reseteo de Claves -->
+          <div class="info-card" style="margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+              <h4 style="margin: 0;">👥 Usuarios del Sistema (${usuarios.length})</h4>
+              <input type="text" id="filtroAdminUsuarios" oninput="filtrarTablaAdminUsuarios()" placeholder="🔍 Buscar por nombre, correo o rol..." style="max-width: 280px; width: 100%; padding: 0.45rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.84rem;">
+            </div>
+
+            <div class="table-responsive">
+              <table id="tablaAdminUsuarios">
+                <thead>
+                  <tr>
+                    <th>Nombre / Legajo</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                    <th>Sector / EESS</th>
+                    <th>Uso (Ingresos / Último)</th>
+                    <th style="text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${usuarios.map(u => `
+                    <tr class="fila-admin-usuario" data-search="${(u.nombre + ' ' + u.email + ' ' + u.rol + ' ' + (u.sector || '') + ' ' + (u.empresaNombre || '')).toLowerCase()}">
+                      <td>
+                        <strong>${u.nombre}</strong>
+                        ${u.legajo ? `<br><small style="color: var(--text-muted);">Legajo: ${u.legajo}</small>` : ''}
+                      </td>
+                      <td style="font-family: monospace; font-size: 0.82rem; color: #93c5fd;">${u.email}</td>
+                      <td>${rolBadge(u.rol)}</td>
+                      <td style="font-size: 0.82rem;">${u.empresaNombre || u.sector || '—'}</td>
+                      <td style="font-size: 0.8rem;">
+                        <strong>${u.totalLogins || 0}</strong> ingresos
+                        <br><small style="color: var(--text-muted);">${fmtFecha(u.ultimoLogin)}</small>
+                      </td>
+                      <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="abrirResetPasswordAdmin('${u.id}', '${u.nombre.replace(/'/g, "\\'")}')">
+                          🔑 Resetear Clave
+                        </button>
+                        ${u.id !== 'USR-ADM-00' && u.id !== 'USR-ADM-DIEGO2026' ? `
+                          <button type="button" class="btn btn-danger btn-sm" style="margin-left: 0.35rem;" onclick="eliminarUsuarioAdmin('${u.id}', '${u.nombre.replace(/'/g, "\\'")}')">
+                            🗑️
+                          </button>
+                        ` : ''}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. Últimos Accesos Registrados -->
+          <div class="info-card">
+            <h4 style="margin-bottom: 0.75rem;">🕒 Últimos Accesos a la Aplicación</h4>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Usuario</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(usoApp.ultimosAccesos || []).length === 0
+                    ? '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1rem;">Aún no hay inicios de sesión registrados.</td></tr>'
+                    : usoApp.ultimosAccesos.map(a => `
+                      <tr>
+                        <td style="font-size: 0.82rem;">${fmtFecha(a.fecha)}</td>
+                        <td><strong>${a.nombre}</strong></td>
+                        <td style="font-family: monospace; font-size: 0.8rem; color: #93c5fd;">${a.email}</td>
+                        <td>${rolBadge(a.rol)}</td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Modal Resetear Contraseña -->
+          <div id="modalResetAdmin" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+            <div class="auth-wrapper" style="max-width: 440px; margin: 0; width: 100%;">
+              <h3 style="margin-bottom: 0.35rem;">🔑 Resetear Contraseña</h3>
+              <p id="resetAdminUserLabel" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;"></p>
+              <form onsubmit="confirmarResetPasswordAdmin(event)">
+                <input type="hidden" id="resetAdminUserId">
+                <div class="form-group">
+                  <label>Nueva Contraseña (mínimo 4 caracteres) *</label>
+                  <input type="text" id="resetAdminNuevaPass" required minlength="4" placeholder="Ingrese la nueva clave..." class="auth-input">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 1.25rem;">
+                  <button type="button" class="btn btn-outline" onclick="cerrarModalResetAdmin()">Cancelar</button>
+                  <button type="submit" class="btn">💾 Guardar Nueva Clave</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        `;
+      } catch {
+        container.innerHTML = `<div class="info-card" style="color: #fca5a5;">⚠️ Error de conexión al cargar panel Admin.</div>`;
+      }
+    }
+
+    window.filtrarTablaAdminUsuarios = () => {
+      const q = (document.getElementById('filtroAdminUsuarios')?.value || '').trim().toLowerCase();
+      document.querySelectorAll('.fila-admin-usuario').forEach(tr => {
+        const txt = tr.getAttribute('data-search') || '';
+        tr.style.display = txt.includes(q) ? '' : 'none';
+      });
+    };
+
+    window.abrirResetPasswordAdmin = (id, nombre) => {
+      const modal = document.getElementById('modalResetAdmin');
+      document.getElementById('resetAdminUserId').value = id;
+      document.getElementById('resetAdminUserLabel').textContent = `Usuario: ${nombre}`;
+      document.getElementById('resetAdminNuevaPass').value = '';
+      if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('resetAdminNuevaPass').focus();
+      }
+    };
+
+    window.cerrarModalResetAdmin = () => {
+      const modal = document.getElementById('modalResetAdmin');
+      if (modal) modal.style.display = 'none';
+    };
+
+    window.confirmarResetPasswordAdmin = async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('resetAdminUserId').value;
+      const nuevaPassword = document.getElementById('resetAdminNuevaPass').value;
+
+      try {
+        const res = await fetch(`/api/admin/usuarios/${id}/reset-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAdminToken()}`
+          },
+          body: JSON.stringify({ nuevaPassword })
+        }).then(r => r.json());
+
+        if (res.ok) {
+          cerrarModalResetAdmin();
+          alert(`✅ ${res.mensaje}`);
+        } else {
+          alert(`⚠️ ${res.error || 'No se pudo resetear la clave.'}`);
+        }
+      } catch {
+        alert('Error de conexión al resetear contraseña.');
+      }
+    };
+
+    window.eliminarUsuarioAdmin = async (id, nombre) => {
+      if (!confirm(`¿Seguro que deseas eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
+      try {
+        const res = await fetch(`/api/admin/usuarios/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${getAdminToken()}` }
+        }).then(r => r.json());
+        if (res.ok) {
+          alert(`✅ Usuario "${nombre}" eliminado.`);
+          await renderAdminDashboard();
+        } else {
+          alert(`⚠️ ${res.error || 'No se pudo eliminar el usuario.'}`);
+        }
+      } catch {
+        alert('Error de conexión al eliminar usuario.');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', initAdminPage);
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import crypto from 'crypto';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste, eliminarEmpresaEnSupabase, eliminarUsuarioEnSupabase, supabase, hashPassword, verifyPassword } from './db.js';
@@ -302,9 +303,72 @@ app.post('/api/configuracion/limites-mensuales', (req, res) => {
 });
 
 /* ========================================================
-   SECCIÓN ADMIN: USUARIOS, RESETEO DE CLAVES Y USO DE APP
+   SECCIÓN ADMIN EXCLUSIVA (/admin): USUARIOS, CLAVES Y USO
    ======================================================== */
-app.get('/api/admin/resumen', (req, res) => {
+const ADMIN_TOKEN_SECRET = process.env.ADMIN_SECRET || 'arauco-admin-diego2026-hmac-secret';
+const ADMIN_EXCLUSIVE_ID = 'USR-ADM-DIEGO2026';
+
+function generarAdminToken(user) {
+  const payload = Buffer.from(JSON.stringify({
+    uid: user.id,
+    email: user.email,
+    exp: Date.now() + 12 * 60 * 60 * 1000
+  })).toString('base64url');
+  const sig = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verificarAdminToken(token) {
+  if (!token || !token.includes('.')) return null;
+  const [payload, sig] = token.split('.');
+  const expectedSig = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(payload).digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!data || data.uid !== ADMIN_EXCLUSIVE_ID || Date.now() > data.exp) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function requireAdminDiego(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const decoded = verificarAdminToken(token);
+  if (!decoded) {
+    return res.status(401).json({ ok: false, error: 'Sesión administrativa inválida o expirada.' });
+  }
+  req.adminUser = decoded;
+  next();
+}
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body;
+  const db = getDb();
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const user = (db.usuarios || []).find(u => u.email.toLowerCase() === cleanEmail);
+
+  if (!user || !verifyPassword(password, user.password)) {
+    return res.status(401).json({ ok: false, error: 'Credenciales inválidas.' });
+  }
+
+  if (user.id !== ADMIN_EXCLUSIVE_ID) {
+    return res.status(403).json({ ok: false, error: 'Acceso denegado: este panel es exclusivo para Diego2026.' });
+  }
+
+  const token = generarAdminToken(user);
+  const { password: _, ...userSafe } = user;
+  res.json({ ok: true, token, user: userSafe });
+});
+
+app.get('/api/admin/resumen', requireAdminDiego, (req, res) => {
   const db = getDb();
   const uso = db.usoApp || { totalLogins: 0, ultimosAccesos: [], porUsuario: {} };
   const porUsuario = uso.porUsuario || {};
@@ -342,7 +406,7 @@ app.get('/api/admin/resumen', (req, res) => {
   });
 });
 
-app.post('/api/admin/usuarios/:id/reset-password', (req, res) => {
+app.post('/api/admin/usuarios/:id/reset-password', requireAdminDiego, (req, res) => {
   const { id } = req.params;
   const { nuevaPassword } = req.body;
   if (!nuevaPassword || String(nuevaPassword).length < 4) {
@@ -360,7 +424,7 @@ app.post('/api/admin/usuarios/:id/reset-password', (req, res) => {
   res.json({ ok: true, mensaje: `Contraseña actualizada para ${user.nombre}` });
 });
 
-app.delete('/api/admin/usuarios/:id', async (req, res) => {
+app.delete('/api/admin/usuarios/:id', requireAdminDiego, async (req, res) => {
   const { id } = req.params;
   if (id === 'USR-ADM-00' || id === 'USR-ADM-DIEGO2026') {
     return res.status(400).json({ ok: false, error: 'No se puede eliminar una cuenta administradora principal.' });
