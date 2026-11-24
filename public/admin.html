@@ -177,7 +177,14 @@
           return;
         }
 
-        const { usuarios, usoApp, estadisticas } = res;
+        const { usuarios, empresas = [], limitesMensuales = {}, usoApp, estadisticas } = res;
+        const lim = {
+          cantidadAndamiosMes: limitesMensuales.cantidadAndamiosMes ?? 50,
+          limiteM3Mes: limitesMensuales.limiteM3Mes ?? 1500,
+          limiteM2Mes: limitesMensuales.limiteM2Mes ?? 600,
+          presupuestoMes: limitesMensuales.presupuestoMes ?? 0,
+          porcentajeAdvertencia: limitesMensuales.porcentajeAdvertencia ?? 80
+        };
         const fmtFecha = (iso) => {
           if (!iso) return 'Sin registros';
           try {
@@ -234,7 +241,151 @@
             </div>
           </div>
 
-          <!-- 2. Gestión de Usuarios y Reseteo de Claves -->
+          <!-- 2. Agregar Gestionadores y Claves -->
+          <div class="info-card" style="margin-bottom: 1.25rem;">
+            <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+              <h4 style="margin: 0;">🛡️ Agregar Gestionador (y su Clave)</h4>
+              <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 0.25rem;">
+                Crea cuentas con perfil Gestionador para administrar pedidos, programación y parque en planta.
+              </p>
+            </div>
+            <form onsubmit="crearGestionadorAdmin(event)">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                <div class="form-group">
+                  <label>Nombre y Apellido *</label>
+                  <input type="text" id="gestNombre" required placeholder="Ej: Ing. Marcelo Rossi">
+                </div>
+                <div class="form-group">
+                  <label>Correo Corporativo *</label>
+                  <input type="email" id="gestEmail" required placeholder="nombre@arauco.com">
+                </div>
+                <div class="form-group">
+                  <label>Contraseña (mín. 4 caracteres) *</label>
+                  <input type="password" id="gestPassword" required minlength="4" placeholder="Clave de acceso...">
+                </div>
+                <div class="form-group">
+                  <label>Legajo (Opcional)</label>
+                  <input type="text" id="gestLegajo" placeholder="Ej: 50102">
+                </div>
+                <div class="form-group">
+                  <label>Sector</label>
+                  <input type="text" id="gestSector" value="Supervisión Andamios Planta">
+                </div>
+                <div class="form-group">
+                  <label>Centro de Costos</label>
+                  <input type="text" id="gestCc" value="CC-SUP-00">
+                </div>
+              </div>
+              <button type="submit" class="btn" style="margin-top: 0.5rem;">
+                ➕ Agregar Gestionador
+              </button>
+            </form>
+          </div>
+
+          <!-- 3. Empresas de Andamios (EESS) y Límite para Advertencias -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+            <div class="info-card">
+              <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h4 style="margin: 0;">👷 Empresas de Andamios (EESS)</h4>
+                <p style="color: var(--text-muted); font-size: 0.83rem; margin-top: 0.25rem;">
+                  Agrega las empresas contratistas habilitadas para operar en planta.
+                </p>
+              </div>
+              <form onsubmit="agregarEessAdmin(event)" style="background: rgba(15, 23, 42, 0.45); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem;">
+                <div class="form-group">
+                  <label>Nombre / Razón Social *</label>
+                  <input type="text" id="adminEessNombre" required placeholder="Ej: Servicios Industriales S.A.">
+                </div>
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label>CUIT</label>
+                    <input type="text" id="adminEessCuit" placeholder="30-XXXXXXXX-X">
+                  </div>
+                  <div class="form-group">
+                    <label>Contacto</label>
+                    <input type="text" id="adminEessContacto" placeholder="Referente">
+                  </div>
+                </div>
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" id="adminEessTel" placeholder="+54 9 ...">
+                  </div>
+                  <div class="form-group">
+                    <label>Correo</label>
+                    <input type="email" id="adminEessEmail" placeholder="contacto@empresa.com">
+                  </div>
+                </div>
+                <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 0.35rem;">
+                  ➕ Agregar Empresa de Andamios
+                </button>
+              </form>
+
+              <div class="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>CUIT / Contacto</th>
+                      <th style="text-align: right;">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${empresas.length === 0
+                      ? '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 0.85rem;">Sin EESS registradas.</td></tr>'
+                      : empresas.map(e => `
+                        <tr>
+                          <td><strong>${e.nombre}</strong>${e.email ? `<br><small style="color: var(--text-muted);">${e.email}</small>` : ''}</td>
+                          <td style="font-size: 0.82rem;">${e.cuit || '—'}${e.contacto ? `<br><small style="color: var(--text-muted);">${e.contacto}</small>` : ''}</td>
+                          <td style="text-align: right;">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarEessAdmin('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">🗑️</button>
+                          </td>
+                        </tr>
+                      `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h4 style="margin: 0;">⚠️ Límite Mensual y Umbral de Advertencias</h4>
+                <p style="color: var(--text-muted); font-size: 0.83rem; margin-top: 0.25rem;">
+                  Define los topes mensuales contratados y el porcentaje desde el cual el sistema emite advertencias.
+                </p>
+              </div>
+              <form onsubmit="guardarLimitesAdmin(event)" style="background: rgba(15, 23, 42, 0.45); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border);">
+                <div class="form-group">
+                  <label>Cantidad Estimada de Andamios / Mes (Unidades)</label>
+                  <input type="number" id="adminLimCant" min="0" step="1" value="${lim.cantidadAndamiosMes}" required>
+                </div>
+                <div class="form-group">
+                  <label>Volumen Estimado Mensual (m³)</label>
+                  <input type="number" id="adminLimM3" min="0" step="0.5" value="${lim.limiteM3Mes}" required>
+                </div>
+                <div class="form-group">
+                  <label>Plataformas Estimadas Mensuales (m²)</label>
+                  <input type="number" id="adminLimM2" min="0" step="0.5" value="${lim.limiteM2Mes}" required>
+                </div>
+                <div class="form-group">
+                  <label>Presupuesto Mensual Estimado ($) — Opcional</label>
+                  <input type="number" id="adminLimPres" min="0" step="100" value="${lim.presupuestoMes}">
+                </div>
+                <div class="form-group">
+                  <label style="color: #fbbf24;">⚠️ Umbral de Advertencia (% del límite mensual)</label>
+                  <input type="number" id="adminLimAdv" min="1" max="100" step="1" value="${lim.porcentajeAdvertencia}" required>
+                  <small style="color: var(--text-muted); font-size: 0.75rem;">
+                    Al alcanzar este % se mostrará alerta amarilla; al 100% alerta roja.
+                  </small>
+                </div>
+                <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+                  💾 Guardar Límites y Advertencias
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- 4. Gestión de Usuarios y Reseteo de Claves -->
           <div class="info-card" style="margin-bottom: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
               <h4 style="margin: 0;">👥 Usuarios del Sistema (${usuarios.length})</h4>
@@ -402,6 +553,102 @@
         }
       } catch {
         alert('Error de conexión al eliminar usuario.');
+      }
+    };
+
+    window.crearGestionadorAdmin = async (e) => {
+      e.preventDefault();
+      const body = {
+        nombre: document.getElementById('gestNombre').value.trim(),
+        email: document.getElementById('gestEmail').value.trim(),
+        password: document.getElementById('gestPassword').value,
+        legajo: document.getElementById('gestLegajo').value.trim(),
+        sector: document.getElementById('gestSector').value.trim(),
+        centroCostos: document.getElementById('gestCc').value.trim()
+      };
+      try {
+        const res = await fetch('/api/admin/gestionadores', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAdminToken()}`
+          },
+          body: JSON.stringify(body)
+        }).then(r => r.json());
+        if (res.ok) {
+          alert(`✅ Gestionador "${res.usuario.nombre}" creado correctamente.`);
+          await renderAdminDashboard();
+        } else {
+          alert(`⚠️ ${res.error || 'No se pudo crear el gestionador.'}`);
+        }
+      } catch {
+        alert('Error de conexión al crear gestionador.');
+      }
+    };
+
+    window.agregarEessAdmin = async (e) => {
+      e.preventDefault();
+      const body = {
+        nombre: document.getElementById('adminEessNombre').value.trim(),
+        cuit: document.getElementById('adminEessCuit').value.trim(),
+        contacto: document.getElementById('adminEessContacto').value.trim(),
+        telefono: document.getElementById('adminEessTel').value.trim(),
+        email: document.getElementById('adminEessEmail').value.trim()
+      };
+      try {
+        const res = await fetch('/api/empresas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).then(r => r.json());
+        if (res.ok) {
+          alert(`✅ EESS "${res.empresa.nombre}" agregada.`);
+          await renderAdminDashboard();
+        } else {
+          alert(`⚠️ ${res.error || 'No se pudo agregar la empresa.'}`);
+        }
+      } catch {
+        alert('Error de conexión al agregar empresa.');
+      }
+    };
+
+    window.eliminarEessAdmin = async (id, nombre) => {
+      if (!confirm(`¿Seguro que deseas quitar la EESS "${nombre}"?`)) return;
+      try {
+        const res = await fetch(`/api/empresas/${id}`, { method: 'DELETE' }).then(r => r.json());
+        if (res.ok) {
+          await renderAdminDashboard();
+        } else {
+          alert(`⚠️ ${res.error || 'No se pudo eliminar la empresa.'}`);
+        }
+      } catch {
+        alert('Error de conexión al eliminar empresa.');
+      }
+    };
+
+    window.guardarLimitesAdmin = async (e) => {
+      e.preventDefault();
+      const body = {
+        cantidadAndamiosMes: Number(document.getElementById('adminLimCant').value || 0),
+        limiteM3Mes: Number(document.getElementById('adminLimM3').value || 0),
+        limiteM2Mes: Number(document.getElementById('adminLimM2').value || 0),
+        presupuestoMes: Number(document.getElementById('adminLimPres').value || 0),
+        porcentajeAdvertencia: Number(document.getElementById('adminLimAdv').value || 80)
+      };
+      try {
+        const res = await fetch('/api/configuracion/limites-mensuales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).then(r => r.json());
+        if (res.ok) {
+          alert('✅ Límites mensuales y umbral de advertencia guardados.');
+          await renderAdminDashboard();
+        } else {
+          alert('⚠️ No se pudieron guardar los límites.');
+        }
+      } catch {
+        alert('Error de conexión al guardar límites.');
       }
     };
 

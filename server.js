@@ -290,13 +290,15 @@ app.get('/api/configuracion/limites-mensuales', (req, res) => {
 });
 
 app.post('/api/configuracion/limites-mensuales', (req, res) => {
-  const { cantidadAndamiosMes, limiteM3Mes, limiteM2Mes, presupuestoMes } = req.body;
+  const { cantidadAndamiosMes, limiteM3Mes, limiteM2Mes, presupuestoMes, porcentajeAdvertencia } = req.body;
   const db = getDb();
+  const prev = db.limitesMensuales || {};
   db.limitesMensuales = {
     cantidadAndamiosMes: Math.max(0, Number(cantidadAndamiosMes) || 0),
     limiteM3Mes: Math.max(0, Number(limiteM3Mes) || 0),
     limiteM2Mes: Math.max(0, Number(limiteM2Mes) || 0),
-    presupuestoMes: Math.max(0, Number(presupuestoMes) || 0)
+    presupuestoMes: Math.max(0, Number(presupuestoMes) || 0),
+    porcentajeAdvertencia: Math.min(100, Math.max(1, Number(porcentajeAdvertencia ?? prev.porcentajeAdvertencia ?? 80) || 80))
   };
   saveDb(db);
   res.json({ ok: true, limitesMensuales: db.limitesMensuales });
@@ -386,6 +388,8 @@ app.get('/api/admin/resumen', requireAdminDiego, (req, res) => {
   res.json({
     ok: true,
     usuarios,
+    empresas: db.empresasServicio || [],
+    limitesMensuales: db.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0, porcentajeAdvertencia: 80 },
     usoApp: {
       totalLogins: uso.totalLogins || 0,
       ultimosAccesos: uso.ultimosAccesos || []
@@ -404,6 +408,45 @@ app.get('/api/admin/resumen', requireAdminDiego, (req, res) => {
       modoDb: supabase ? 'Supabase PostgreSQL' : 'Local (db.json)'
     }
   });
+});
+
+app.post('/api/admin/gestionadores', requireAdminDiego, (req, res) => {
+  const { nombre, email, password, sector, legajo, centroCostos } = req.body;
+  const cleanName = (nombre || '').trim();
+  const cleanEmail = (email || '').toLowerCase().trim();
+
+  if (!cleanName || !cleanEmail || !password) {
+    return res.status(400).json({ ok: false, error: 'Nombre, correo y contraseña son obligatorios.' });
+  }
+  if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    return res.status(400).json({ ok: false, error: 'Ingrese un correo electrónico válido.' });
+  }
+  if (String(password).length < 4) {
+    return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' });
+  }
+
+  const db = getDb();
+  if ((db.usuarios || []).some(u => u.email.toLowerCase() === cleanEmail)) {
+    return res.status(400).json({ ok: false, error: 'Ya existe un usuario registrado con ese correo.' });
+  }
+
+  const nuevoGest = {
+    id: `USR-GEST-${Date.now()}`,
+    nombre: cleanName,
+    email: cleanEmail,
+    password: hashPassword(String(password)),
+    rol: 'GESTIONADOR',
+    sector: (sector || 'Supervisión Andamios Planta').trim(),
+    legajo: (legajo || '').trim(),
+    centroCostos: (centroCostos || 'CC-SUP-00').trim(),
+    fechaRegistro: new Date().toISOString()
+  };
+
+  db.usuarios.push(nuevoGest);
+  saveDb(db);
+
+  const { password: _, ...safeUser } = nuevoGest;
+  res.status(201).json({ ok: true, usuario: safeUser });
 });
 
 app.post('/api/admin/usuarios/:id/reset-password', requireAdminDiego, (req, res) => {

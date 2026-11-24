@@ -80,7 +80,8 @@ const LIMITES_MENSUALES_BASE = {
   cantidadAndamiosMes: 50,
   limiteM3Mes: 1500,
   limiteM2Mes: 600,
-  presupuestoMes: 0
+  presupuestoMes: 0,
+  porcentajeAdvertencia: 80
 };
 
 const INITIAL_DATA = {

@@ -2952,14 +2952,15 @@ window.despacharDesarme = async (solicitudId) => {
 function renderKPIsGestionador(container) {
   const m = AppState.metricasGestionador || {};
   const todas = AppState.todasSolicitudesGestionador;
-  const lim = m.limitesMensuales || AppState.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0 };
+  const lim = m.limitesMensuales || AppState.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0, porcentajeAdvertencia: 80 };
   const cons = m.consumoMesActual || { mes: new Date().toISOString().slice(0, 7), cantidadMes: 0, m3Mes: 0, m2Mes: 0 };
+  const umbralAdv = lim.porcentajeAdvertencia || 80;
 
   const calcPct = (val, max) => (max > 0 ? Math.min(100, Math.round((val / max) * 100)) : 0);
   const pctCant = calcPct(cons.cantidadMes, lim.cantidadAndamiosMes);
   const pctM3 = calcPct(cons.m3Mes, lim.limiteM3Mes);
   const pctM2 = calcPct(cons.m2Mes, lim.limiteM2Mes);
-  const barColor = (pct) => pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#10b981';
+  const barColor = (pct) => pct >= 100 ? '#ef4444' : pct >= umbralAdv ? '#f59e0b' : '#10b981';
 
   const porEmpresa = {};
   todas.forEach(s => {
