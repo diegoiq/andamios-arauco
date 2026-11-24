@@ -1883,13 +1883,15 @@ window.solicitarDesarme = async (solicitudId) => {
    ======================================================== */
 async function renderPortalGestionador(container, user) {
   try {
-    const [resSol, resMet] = await Promise.all([
+    const [resSol, resMet, resEmp] = await Promise.all([
       fetch('/api/solicitudes').then(r => r.json()),
-      fetch('/api/gestionador/metricas').then(r => r.json())
+      fetch('/api/gestionador/metricas').then(r => r.json()),
+      fetch('/api/empresas').then(r => r.json())
     ]);
 
     if (resSol.ok) AppState.todasSolicitudesGestionador = resSol.solicitudes;
     if (resMet.ok) AppState.metricasGestionador = resMet.metricas;
+    if (resEmp.ok) AppState.empresas = resEmp.empresas;
   } catch (err) {
     console.error('Error cargando datos del gestionador:', err);
   }
@@ -2197,8 +2199,9 @@ function renderVistaSemanalGestionador(container) {
       <div class="toolbar-center">
         <select id="filtroEmpresaSemanal" class="select-compact" onchange="cambiarFiltroEmpresaSemanal(this.value)">
           <option value="TODAS" ${AppState.filtroEmpresaSemanal === 'TODAS' ? 'selected' : ''}>Todas las Empresas</option>
-          <option value="Andamios del Sur S.A." ${AppState.filtroEmpresaSemanal === 'Andamios del Sur S.A.' ? 'selected' : ''}>Andamios del Sur S.A.</option>
-          <option value="Montajes Industriales S.A." ${AppState.filtroEmpresaSemanal === 'Montajes Industriales S.A.' ? 'selected' : ''}>Montajes Industriales S.A.</option>
+          ${(AppState.empresas || []).map(e => `
+            <option value="${e.nombre}" ${AppState.filtroEmpresaSemanal === e.nombre ? 'selected' : ''}>${e.nombre}</option>
+          `).join('')}
         </select>
 
         <select id="filtroEventoSemanal" class="select-compact" onchange="cambiarFiltroEventoSemanal(this.value)">
@@ -2439,7 +2442,7 @@ function renderTablaActivosSemanal(andamios) {
 }
 
 function renderResumenContratistasSemanal(andamiosActivos, eventosPorDia) {
-  const empresas = ['Andamios del Sur S.A.', 'Montajes Industriales S.A.'];
+  const empresas = (AppState.empresas || []).map(e => e.nombre);
 
   const resumen = empresas.map(emp => {
     const misActivos = andamiosActivos.filter(s => s.proveedorAsignado === emp);
