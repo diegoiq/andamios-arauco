@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste } from './db.js';
+import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste, eliminarEmpresaEnSupabase } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -213,7 +213,68 @@ app.get('/api/usuarios/demo', (req, res) => {
 
 app.get('/api/empresas', (req, res) => {
   const db = getDb();
+  res.json({ ok: true, empresas: db.empresasServicio || [] });
+});
+
+app.post('/api/empresas', (req, res) => {
+  const { nombre, cuit, contacto, telefono, email } = req.body;
+  const nombreLimpio = (nombre || '').trim();
+  if (!nombreLimpio) {
+    return res.status(400).json({ ok: false, error: 'El nombre de la EESS es obligatorio.' });
+  }
+
+  const db = getDb();
+  if (!Array.isArray(db.empresasServicio)) db.empresasServicio = [];
+
+  const existe = db.empresasServicio.some(e => e.nombre.trim().toLowerCase() === nombreLimpio.toLowerCase());
+  if (existe) {
+    return res.status(400).json({ ok: false, error: 'Ya existe una EESS registrada con ese nombre.' });
+  }
+
+  const nuevaEmpresa = {
+    id: `EMP-${Date.now()}`,
+    nombre: nombreLimpio,
+    cuit: (cuit || '').trim(),
+    contacto: (contacto || '').trim(),
+    telefono: (telefono || '').trim(),
+    email: (email || '').trim(),
+    activa: true
+  };
+
+  db.empresasServicio.push(nuevaEmpresa);
+  saveDb(db);
+  res.status(201).json({ ok: true, empresa: nuevaEmpresa, empresas: db.empresasServicio });
+});
+
+app.delete('/api/empresas/:id', async (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  const prevLen = (db.empresasServicio || []).length;
+  db.empresasServicio = (db.empresasServicio || []).filter(e => e.id !== id);
+  if (db.empresasServicio.length === prevLen) {
+    return res.status(404).json({ ok: false, error: 'Empresa no encontrada.' });
+  }
+  saveDb(db);
+  await eliminarEmpresaEnSupabase(id);
   res.json({ ok: true, empresas: db.empresasServicio });
+});
+
+app.get('/api/configuracion/limites-mensuales', (req, res) => {
+  const db = getDb();
+  res.json({ ok: true, limitesMensuales: db.limitesMensuales });
+});
+
+app.post('/api/configuracion/limites-mensuales', (req, res) => {
+  const { cantidadAndamiosMes, limiteM3Mes, limiteM2Mes, presupuestoMes } = req.body;
+  const db = getDb();
+  db.limitesMensuales = {
+    cantidadAndamiosMes: Math.max(0, Number(cantidadAndamiosMes) || 0),
+    limiteM3Mes: Math.max(0, Number(limiteM3Mes) || 0),
+    limiteM2Mes: Math.max(0, Number(limiteM2Mes) || 0),
+    presupuestoMes: Math.max(0, Number(presupuestoMes) || 0)
+  };
+  saveDb(db);
+  res.json({ ok: true, limitesMensuales: db.limitesMensuales });
 });
 
 /* ========================================================
@@ -918,10 +979,21 @@ app.get('/api/gestionador/metricas', (req, res) => {
 
   let m3ActivosPlanta = 0;
   let m2ActivosPlanta = 0;
+  const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+  let cantidadMes = 0;
+  let m3Mes = 0;
+  let m2Mes = 0;
+
   todas.forEach(s => {
     if (['HABILITADO', 'EN_ALQUILER'].includes(s.estado)) {
       m3ActivosPlanta += (s.totalVolumenRealM3 || s.dimSolicitadaAndamio?.volumenM3 || 0);
       m2ActivosPlanta += (s.totalSuperficieRealM2 || s.dimSolicitadaPlataforma?.superficieM2 || 0);
+    }
+    const fechaRef = (s.fechaCreacion || s.fechaProgramada || '').slice(0, 7);
+    if (fechaRef === mesActual && s.estado !== 'ANULADO') {
+      cantidadMes += 1;
+      m3Mes += (s.totalVolumenRealM3 || s.dimSolicitadaAndamio?.volumenM3 || 0);
+      m2Mes += (s.totalSuperficieRealM2 || s.dimSolicitadaPlataforma?.superficieM2 || 0);
     }
   });
 
@@ -940,7 +1012,14 @@ app.get('/api/gestionador/metricas', (req, res) => {
       desarmados,
       anulados,
       m3ActivosPlanta: parseFloat(m3ActivosPlanta.toFixed(2)),
-      m2ActivosPlanta: parseFloat(m2ActivosPlanta.toFixed(2))
+      m2ActivosPlanta: parseFloat(m2ActivosPlanta.toFixed(2)),
+      limitesMensuales: db.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0 },
+      consumoMesActual: {
+        mes: mesActual,
+        cantidadMes,
+        m3Mes: parseFloat(m3Mes.toFixed(2)),
+        m2Mes: parseFloat(m2Mes.toFixed(2))
+      }
     }
   });
 });

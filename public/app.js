@@ -1,46 +1,9 @@
 // ESTADO GLOBAL DE LA APLICACIÓN
 const AppState = {
   currentUser: null,
-  demoUsers: [
-    {
-      id: 'USR-ADM-00',
-      nombre: 'Diego A. Cristaldo (Admin ARAUCO)',
-      email: 'diego.a.cristaldo@arauco.com',
-      rol: 'GESTIONADOR',
-      sector: 'Administración General de Andamios y Paradas',
-      legajo: '50100',
-      centroCostos: 'CC-SUP-00'
-    },
-    {
-      id: 'USR-SOL-01',
-      nombre: 'Juan Pérez (Mantenimiento)',
-      email: 'juan.perez@arauco.com',
-      rol: 'SOLICITANTE',
-      sector: 'Mantenimiento Mecánico',
-      legajo: '74821',
-      centroCostos: 'CC-MTTO-01'
-    },
-    {
-      id: 'USR-ADM-01',
-      nombre: 'Ing. Marcelo Rossi (Gestionador ARAUCO)',
-      email: 'marcelo.rossi@arauco.com',
-      rol: 'GESTIONADOR',
-      sector: 'Administración de Andamios y Paradas',
-      legajo: '50112'
-    },
-    {
-      id: 'USR-CONTR-01',
-      nombre: 'Supervisor Obra (Andamios del Sur)',
-      email: 'montajes@andamiosdelsur.com',
-      rol: 'EMPRESA_SERVICIO',
-      empresaId: 'EMP-01',
-      empresaNombre: 'Andamios del Sur S.A.'
-    }
-  ],
-  empresas: [
-    { id: 'EMP-01', nombre: 'Andamios del Sur S.A.', contacto: 'Carlos Méndez', telefono: '+54 9 11 5555-0101' },
-    { id: 'EMP-02', nombre: 'Montajes Industriales NOA', contacto: 'Roberto Vaca', telefono: '+54 9 11 5555-0202' }
-  ],
+  demoUsers: [],
+  empresas: [],
+  limitesMensuales: { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0 },
   sistemaInfo: null,
   activeTabSolicitante: 'anual', // 'anual', 'pgp', 'historico'
   activeTabGestionador: 'semanal', // 'semanal', 'bandeja', 'parque', 'desarmes', 'certificacion', 'auditoria', 'kpis', 'solicitar'
@@ -89,17 +52,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function cargarMetadatos() {
   try {
-    const [resUsers, resEmpresas, resInfo] = await Promise.all([
+    const [resUsers, resEmpresas, resInfo, resLimites] = await Promise.all([
       fetch('/api/usuarios/demo').then(r => r.json()),
       fetch('/api/empresas').then(r => r.json()),
-      fetch('/api/sistema/info').then(r => r.json())
+      fetch('/api/sistema/info').then(r => r.json()),
+      fetch('/api/configuracion/limites-mensuales').then(r => r.json())
     ]);
 
     if (resUsers.ok) AppState.demoUsers = resUsers.usuarios;
-    if (resEmpresas.ok) AppState.empresas = resEmpresas.empresas;
+    if (resEmpresas.ok) {
+      AppState.empresas = resEmpresas.empresas;
+      actualizarSelectEmpresasRegistro();
+    }
     if (resInfo.ok) AppState.sistemaInfo = resInfo;
+    if (resLimites.ok && resLimites.limitesMensuales) AppState.limitesMensuales = resLimites.limitesMensuales;
   } catch (err) {
     console.error('Error cargando metadatos iniciales:', err);
+  }
+}
+
+function actualizarSelectEmpresasRegistro() {
+  const sel = document.getElementById('regEmpresaEess');
+  if (!sel) return;
+  if (!AppState.empresas || AppState.empresas.length === 0) {
+    sel.innerHTML = '<option value="">-- Sin EESS registradas (solicitar al Gestionador) --</option>';
+  } else {
+    sel.innerHTML = AppState.empresas.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('');
   }
 }
 
@@ -252,7 +230,7 @@ function renderLogin() {
             <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
               Correo Electrónico Corporativo
             </label>
-            <input type="email" id="loginEmail" placeholder="usuario@arauco.com" required value="diego.a.cristaldo@arauco.com" class="auth-input">
+            <input type="email" id="loginEmail" placeholder="usuario@arauco.com" required value="" class="auth-input">
           </div>
 
           <div class="form-group" style="margin-bottom: 1.25rem;">
@@ -263,7 +241,7 @@ function renderLogin() {
               </button>
             </div>
             <div style="position: relative;">
-              <input type="password" id="loginPassword" value="Arauco!2026" placeholder="Ingrese su contraseña..." required class="auth-input">
+              <input type="password" id="loginPassword" value="" placeholder="Ingrese su contraseña..." required class="auth-input">
             </div>
             <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 0.45rem;">
               <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" style="font-size: 0.78rem; color: var(--arauco-accent); text-decoration: underline;">
@@ -402,9 +380,9 @@ function renderLogin() {
                   Empresa Contratista
                 </label>
                 <select id="regEmpresaEess" style="width: 100%; padding: 0.55rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.82rem;">
-                  <option value="Andamios del Sur S.A.">Andamios del Sur S.A.</option>
-                  <option value="Montajes Industriales S.A.">Montajes Industriales S.A.</option>
-                  <option value="Andamios y Estructuras del Plata S.A.">Andamios y Estructuras del Plata S.A.</option>
+                  ${AppState.empresas && AppState.empresas.length > 0
+                    ? AppState.empresas.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('')
+                    : '<option value="">-- Sin EESS registradas (solicitar al Gestionador) --</option>'}
                 </select>
               </div>
               <div class="form-group">
@@ -722,7 +700,14 @@ window.handleRegistroSubmit = async (e) => {
     sector = document.getElementById('regSectorProd')?.value || 'Producción';
     centroCostos = document.getElementById('regCcProd')?.value || 'CC-PROD-02';
   } else if (perfil === 'EJECUTOR_EESS') {
-    empresaNombre = document.getElementById('regEmpresaEess')?.value || 'Andamios del Sur S.A.';
+    empresaNombre = document.getElementById('regEmpresaEess')?.value || '';
+    if (!empresaNombre) {
+      if (errBox) {
+        errBox.textContent = '⚠️ No hay Empresas de Servicio (EESS) registradas. Solicite al Gestionador que agregue la EESS.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
     funcionObra = document.getElementById('regFuncionEess')?.value || 'Supervisor de Montaje';
     sector = funcionObra;
   }
@@ -1834,6 +1819,10 @@ async function renderPortalGestionador(container, user) {
         <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
         <span>Nueva Solicitud</span>
       </button>
+      <button class="tab-btn-clean ${AppState.activeTabGestionador === 'configuracion' ? 'active' : ''}" onclick="cambiarTabGestionador('configuracion')">
+        <svg class="tab-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>EESS y Límites</span>
+      </button>
     </div>
 
     <!-- Tira de Indicadores Compacta (Stat Strip de una sola línea) -->
@@ -1881,6 +1870,7 @@ async function renderPortalGestionador(container, user) {
   else if (AppState.activeTabGestionador === 'auditoria') renderAuditoriaGestionador(subContainer);
   else if (AppState.activeTabGestionador === 'kpis') renderKPIsGestionador(subContainer);
   else if (AppState.activeTabGestionador === 'solicitar') renderSolicitarComoAdmin(subContainer, user);
+  else if (AppState.activeTabGestionador === 'configuracion') renderConfiguracionGestionador(subContainer);
 }
 
 window.cambiarTabGestionador = (tab) => {
@@ -2556,9 +2546,9 @@ function renderBandejaGestionador(container) {
           <div class="form-group">
             <label>Empresa de Servicio Asignada</label>
             <select id="progEmpresa" required>
-              ${AppState.empresas.map(e => `
-                <option value="${e.nombre}">${e.nombre}</option>
-              `).join('')}
+              ${AppState.empresas && AppState.empresas.length > 0
+                ? AppState.empresas.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('')
+                : '<option value="">-- Primero agregue una EESS en la pestaña "EESS y Límites" --</option>'}
             </select>
           </div>
 
@@ -2962,6 +2952,14 @@ window.despacharDesarme = async (solicitudId) => {
 function renderKPIsGestionador(container) {
   const m = AppState.metricasGestionador || {};
   const todas = AppState.todasSolicitudesGestionador;
+  const lim = m.limitesMensuales || AppState.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0 };
+  const cons = m.consumoMesActual || { mes: new Date().toISOString().slice(0, 7), cantidadMes: 0, m3Mes: 0, m2Mes: 0 };
+
+  const calcPct = (val, max) => (max > 0 ? Math.min(100, Math.round((val / max) * 100)) : 0);
+  const pctCant = calcPct(cons.cantidadMes, lim.cantidadAndamiosMes);
+  const pctM3 = calcPct(cons.m3Mes, lim.limiteM3Mes);
+  const pctM2 = calcPct(cons.m2Mes, lim.limiteM2Mes);
+  const barColor = (pct) => pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#10b981';
 
   const porEmpresa = {};
   todas.forEach(s => {
@@ -2999,6 +2997,49 @@ function renderKPIsGestionador(container) {
         </div>
       </div>
 
+      <!-- Límites Estimados Mensuales Contratados -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.85rem;">
+          <div>
+            <h4 style="margin: 0; font-size: 0.95rem; color: #fff;">📊 Consumo del Mes (${cons.mes}) vs. Límites Estimados Contratados</h4>
+            <small style="color: var(--text-muted);">Referencia mensual configurada por el Gestionador.</small>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cambiarTabGestionador('configuracion')">⚙️ Ajustar Límites</button>
+        </div>
+
+        <div class="grid-3">
+          <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.35rem;">
+              <span>Andamios del Mes</span>
+              <strong>${cons.cantidadMes} / ${lim.cantidadAndamiosMes || '—'} unid. (${pctCant}%)</strong>
+            </div>
+            <div style="height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+              <div style="width: ${pctCant}%; height: 100%; background: ${barColor(pctCant)};"></div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.35rem;">
+              <span>Volumen Mensual</span>
+              <strong>${cons.m3Mes} / ${lim.limiteM3Mes || '—'} m³ (${pctM3}%)</strong>
+            </div>
+            <div style="height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+              <div style="width: ${pctM3}%; height: 100%; background: ${barColor(pctM3)};"></div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.35rem;">
+              <span>Plataformas Mensuales</span>
+              <strong>${cons.m2Mes} / ${lim.limiteM2Mes || '—'} m² (${pctM2}%)</strong>
+            </div>
+            <div style="height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+              <div style="width: ${pctM2}%; height: 100%; background: ${barColor(pctM2)};"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <h4>Distribución por Empresa Contratista</h4>
       <div class="table-responsive">
         <table>
@@ -3012,7 +3053,9 @@ function renderKPIsGestionador(container) {
             </tr>
           </thead>
           <tbody>
-            ${Object.keys(porEmpresa).map(k => `
+            ${Object.keys(porEmpresa).length === 0
+              ? '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1rem;">Sin solicitudes registradas aún.</td></tr>'
+              : Object.keys(porEmpresa).map(k => `
               <tr>
                 <td><strong>${k}</strong></td>
                 <td>${porEmpresa[k].total}</td>
@@ -3027,6 +3070,201 @@ function renderKPIsGestionador(container) {
     </div>
   `;
 }
+
+function renderConfiguracionGestionador(container) {
+  const empresas = AppState.empresas || [];
+  const lim = (AppState.metricasGestionador && AppState.metricasGestionador.limitesMensuales) || AppState.limitesMensuales || {
+    cantidadAndamiosMes: 50,
+    limiteM3Mes: 1500,
+    limiteM2Mes: 600,
+    presupuestoMes: 0
+  };
+
+  container.innerHTML = `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+      <!-- Bloque 1: Gestión de EESS de Andamios -->
+      <div class="info-card">
+        <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+          <h3>👷 Empresas de Servicios (EESS) de Andamios</h3>
+          <p style="color: var(--text-muted); font-size: 0.84rem;">
+            Agregue las empresas contratistas habilitadas para recibir órdenes de montaje y registrar supervisores.
+          </p>
+        </div>
+
+        <form onsubmit="agregarNuevaEESS(event)" style="background: rgba(15, 23, 42, 0.45); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1.25rem;">
+          <div class="form-group">
+            <label>Nombre / Razón Social de la EESS *</label>
+            <input type="text" id="nuevaEessNombre" required placeholder="Ej: Servicios Industriales S.A.">
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>CUIT (Opcional)</label>
+              <input type="text" id="nuevaEessCuit" placeholder="30-XXXXXXXX-X">
+            </div>
+            <div class="form-group">
+              <label>Contacto / Supervisor</label>
+              <input type="text" id="nuevaEessContacto" placeholder="Nombre del referente">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Teléfono</label>
+              <input type="text" id="nuevaEessTelefono" placeholder="+54 9 ...">
+            </div>
+            <div class="form-group">
+              <label>Correo Corporativo</label>
+              <input type="email" id="nuevaEessEmail" placeholder="contacto@empresa.com">
+            </div>
+          </div>
+          <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+            ➕ Agregar EESS de Andamio
+          </button>
+        </form>
+
+        <h4 style="margin-bottom: 0.65rem;">EESS Registradas (${empresas.length})</h4>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>CUIT / Contacto</th>
+                <th style="text-align: right;">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${empresas.length === 0
+                ? '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay EESS cargadas. Agregue la primera arriba.</td></tr>'
+                : empresas.map(e => `
+                  <tr>
+                    <td>
+                      <strong>${e.nombre}</strong>
+                      ${e.email ? `<br><small style="color: var(--text-muted);">${e.email}</small>` : ''}
+                    </td>
+                    <td>
+                      <span style="font-size: 0.82rem;">${e.cuit || '—'}</span>
+                      ${e.contacto ? `<br><small style="color: var(--text-muted);">${e.contacto}${e.telefono ? ' · ' + e.telefono : ''}</small>` : ''}
+                    </td>
+                    <td style="text-align: right;">
+                      <button type="button" class="btn btn-danger btn-sm" onclick="eliminarEESS('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">
+                        🗑️ Quitar
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bloque 2: Límites Estimados Mensuales -->
+      <div class="info-card">
+        <div style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+          <h3>📊 Límites Estimados de Andamios Mensuales</h3>
+          <p style="color: var(--text-muted); font-size: 0.84rem;">
+            Defina los topes mensuales estimados que se contratan habitualmente para monitorear el consumo en planta.
+          </p>
+        </div>
+
+        <form onsubmit="guardarLimitesMensuales(event)" style="background: rgba(15, 23, 42, 0.45); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+          <div class="form-group">
+            <label>Cantidad Estimada de Andamios / Mes (Unidades)</label>
+            <input type="number" id="limCantidadMes" min="0" step="1" value="${lim.cantidadAndamiosMes ?? 50}" required>
+          </div>
+          <div class="form-group">
+            <label>Volumen Estimado Mensual de Andamios (m³)</label>
+            <input type="number" id="limM3Mes" min="0" step="0.5" value="${lim.limiteM3Mes ?? 1500}" required>
+          </div>
+          <div class="form-group">
+            <label>Superficie Estimada Mensual de Plataformas (m²)</label>
+            <input type="number" id="limM2Mes" min="0" step="0.5" value="${lim.limiteM2Mes ?? 600}" required>
+          </div>
+          <div class="form-group">
+            <label>Presupuesto Mensual Estimado ($) — Opcional</label>
+            <input type="number" id="limPresupuestoMes" min="0" step="100" value="${lim.presupuestoMes ?? 0}">
+          </div>
+          <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 0.75rem;">
+            💾 Guardar Límites Mensuales
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.agregarNuevaEESS = async (e) => {
+  e.preventDefault();
+  const nombre = document.getElementById('nuevaEessNombre')?.value.trim();
+  const cuit = document.getElementById('nuevaEessCuit')?.value.trim();
+  const contacto = document.getElementById('nuevaEessContacto')?.value.trim();
+  const telefono = document.getElementById('nuevaEessTelefono')?.value.trim();
+  const email = document.getElementById('nuevaEessEmail')?.value.trim();
+
+  if (!nombre) return;
+
+  try {
+    const res = await fetch('/api/empresas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, cuit, contacto, telefono, email })
+    }).then(r => r.json());
+
+    if (res.ok) {
+      AppState.empresas = res.empresas;
+      actualizarSelectEmpresasRegistro();
+      alert(`✅ EESS "${res.empresa.nombre}" agregada correctamente.`);
+      renderPortalPorRol();
+    } else {
+      alert(`⚠️ ${res.error || 'No se pudo agregar la EESS.'}`);
+    }
+  } catch (err) {
+    alert('Error de conexión al guardar EESS.');
+  }
+};
+
+window.eliminarEESS = async (id, nombre) => {
+  if (!confirm(`¿Seguro que deseas quitar la EESS "${nombre}" de la lista?`)) return;
+  try {
+    const res = await fetch(`/api/empresas/${id}`, { method: 'DELETE' }).then(r => r.json());
+    if (res.ok) {
+      AppState.empresas = res.empresas;
+      actualizarSelectEmpresasRegistro();
+      renderPortalPorRol();
+    } else {
+      alert(`⚠️ ${res.error || 'No se pudo eliminar la EESS.'}`);
+    }
+  } catch (err) {
+    alert('Error de conexión al eliminar EESS.');
+  }
+};
+
+window.guardarLimitesMensuales = async (e) => {
+  e.preventDefault();
+  const cantidadAndamiosMes = Number(document.getElementById('limCantidadMes')?.value || 0);
+  const limiteM3Mes = Number(document.getElementById('limM3Mes')?.value || 0);
+  const limiteM2Mes = Number(document.getElementById('limM2Mes')?.value || 0);
+  const presupuestoMes = Number(document.getElementById('limPresupuestoMes')?.value || 0);
+
+  try {
+    const res = await fetch('/api/configuracion/limites-mensuales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cantidadAndamiosMes, limiteM3Mes, limiteM2Mes, presupuestoMes })
+    }).then(r => r.json());
+
+    if (res.ok) {
+      AppState.limitesMensuales = res.limitesMensuales;
+      if (AppState.metricasGestionador) {
+        AppState.metricasGestionador.limitesMensuales = res.limitesMensuales;
+      }
+      alert('✅ Límites estimados mensuales guardados correctamente.');
+      renderPortalPorRol();
+    } else {
+      alert('⚠️ No se pudieron guardar los límites mensuales.');
+    }
+  } catch (err) {
+    alert('Error de conexión al guardar límites mensuales.');
+  }
+};
 
 /* ========================================================
    MESA DE SEGURIDAD E HIGIENE (HSE) — CONTROL OPERATIVO EN PLANTA
