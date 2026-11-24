@@ -30,6 +30,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+function registrarActionLog(db, { tipo = 'INFO', accion, usuario = 'Sistema', detalle = '' }) {
+  if (!Array.isArray(db.actionLogs)) db.actionLogs = [];
+  db.actionLogs.unshift({
+    id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    fecha: new Date().toISOString(),
+    tipo,
+    accion,
+    usuario,
+    detalle
+  });
+  if (db.actionLogs.length > 100) {
+    db.actionLogs = db.actionLogs.slice(0, 100);
+  }
+}
+
 /* ========================================================
    AUTENTICACIÓN Y METADATOS
    ======================================================== */
@@ -64,6 +79,12 @@ app.post('/api/auth/login', (req, res) => {
   if (db.usoApp.ultimosAccesos.length > 30) {
     db.usoApp.ultimosAccesos = db.usoApp.ultimosAccesos.slice(0, 30);
   }
+  registrarActionLog(db, {
+    tipo: 'AUTH',
+    accion: 'Inicio de sesión',
+    usuario: user.nombre,
+    detalle: `${user.email} (${user.rol})`
+  });
   saveDb(db);
 
   const { password: _, ...userSafe } = user;
@@ -128,6 +149,12 @@ app.post('/api/auth/register', (req, res) => {
   };
 
   db.usuarios.push(nuevoUsuario);
+  registrarActionLog(db, {
+    tipo: 'USUARIO',
+    accion: 'Nuevo registro',
+    usuario: nuevoUsuario.nombre,
+    detalle: `${nuevoUsuario.email} (${nuevoUsuario.rol})`
+  });
   saveDb(db);
 
   const { password: _, ...userSafe } = nuevoUsuario;
@@ -267,6 +294,12 @@ app.post('/api/empresas', (req, res) => {
   };
 
   db.empresasServicio.push(nuevaEmpresa);
+  registrarActionLog(db, {
+    tipo: 'CONFIG',
+    accion: 'Alta de EESS',
+    usuario: 'Gestionador / Admin',
+    detalle: nuevaEmpresa.nombre
+  });
   saveDb(db);
   res.status(201).json({ ok: true, empresa: nuevaEmpresa, empresas: db.empresasServicio });
 });
@@ -390,6 +423,7 @@ app.get('/api/admin/resumen', requireAdminDiego, (req, res) => {
     usuarios,
     empresas: db.empresasServicio || [],
     limitesMensuales: db.limitesMensuales || { cantidadAndamiosMes: 50, limiteM3Mes: 1500, limiteM2Mes: 600, presupuestoMes: 0, porcentajeAdvertencia: 80 },
+    actionLogs: (db.actionLogs || []).slice(0, 60),
     usoApp: {
       totalLogins: uso.totalLogins || 0,
       ultimosAccesos: uso.ultimosAccesos || []
@@ -443,6 +477,12 @@ app.post('/api/admin/gestionadores', requireAdminDiego, (req, res) => {
   };
 
   db.usuarios.push(nuevoGest);
+  registrarActionLog(db, {
+    tipo: 'ADMIN',
+    accion: 'Alta de Gestionador',
+    usuario: 'Diego2026',
+    detalle: `${nuevoGest.nombre} (${nuevoGest.email})`
+  });
   saveDb(db);
 
   const { password: _, ...safeUser } = nuevoGest;
@@ -463,6 +503,12 @@ app.post('/api/admin/usuarios/:id/reset-password', requireAdminDiego, (req, res)
   }
 
   user.password = hashPassword(String(nuevaPassword));
+  registrarActionLog(db, {
+    tipo: 'ADMIN',
+    accion: 'Reseteo de clave',
+    usuario: 'Diego2026',
+    detalle: `Usuario: ${user.nombre} (${user.email})`
+  });
   saveDb(db);
   res.json({ ok: true, mensaje: `Contraseña actualizada para ${user.nombre}` });
 });
@@ -805,6 +851,12 @@ app.post('/api/solicitudes', (req, res) => {
   };
 
   db.solicitudes.push(nuevaSolicitud);
+  registrarActionLog(db, {
+    tipo: 'PEDIDO',
+    accion: 'Nuevo pedido de andamio',
+    usuario: nuevaSolicitud.solicitanteNombre || 'Solicitante',
+    detalle: `${nuevaSolicitud.numeroCorrelativo} · ${nuevaSolicitud.ubicacionTecnica || 'Sin ubicación'}`
+  });
   saveDb(db);
 
   res.json({ ok: true, solicitud: nuevaSolicitud });
@@ -1102,6 +1154,12 @@ app.post('/api/gestionador/programar', (req, res) => {
     }
   });
 
+  registrarActionLog(db, {
+    tipo: 'PROGRAMACION',
+    accion: 'Pedidos programados',
+    usuario: 'Gestionador',
+    detalle: `${actualizados.length} pedido(s) asignados a ${proveedorAsignado || 'EESS'}`
+  });
   saveDb(db);
   res.json({ ok: true, actualizados: actualizados.length, solicitudes: actualizados });
 });

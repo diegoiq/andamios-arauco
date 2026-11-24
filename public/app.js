@@ -126,7 +126,9 @@ window.toggleModoAdminFromDropdown = function() {
 window.logoutUsuario = function() {
   window.closeUserDropdown();
   if (confirm('¿Desea cerrar la sesión actual?')) {
+    detenerPollingPedidos();
     localStorage.removeItem('arauco_user');
+    localStorage.removeItem('andamios_session');
     AppState.currentUser = null;
     actualizarUserBar();
     renderLogin();
@@ -1005,9 +1007,12 @@ function renderPortalPorRol() {
   if (!container) return;
   const user = AppState.currentUser;
   if (!user) {
+    detenerPollingPedidos();
     renderLogin();
     return;
   }
+
+  iniciarPollingPedidos();
 
   if (user.rol === 'SOLICITANTE') {
     renderPortalSolicitante(container, user);
@@ -1020,6 +1025,133 @@ function renderPortalPorRol() {
   } else if (user.rol === 'EMPRESA_SERVICIO') {
     renderPortalEjecutante(container, user);
   }
+}
+
+/* ========================================================
+   POLLING Y NOTIFICACIONES EN TIEMPO REAL (CADA 15s)
+   ======================================================== */
+let _pollingIntervalId = null;
+let _snapshotSolicitudes = null;
+
+function mostrarNotificacionToast(mensaje, tipo = 'info') {
+  let toastBox = document.getElementById('araucoToastContainer');
+  if (!toastBox) {
+    toastBox = document.createElement('div');
+    toastBox.id = 'araucoToastContainer';
+    toastBox.style.cssText = 'position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; max-width: 360px; width: calc(100% - 2rem); pointer-events: none;';
+    document.body.appendChild(toastBox);
+  }
+
+  const colors = {
+    info: { bg: '#0f172a', border: '#38bdf8', text: '#e0f2fe' },
+    success: { bg: '#064e3b', border: '#10b981', text: '#d1fae5' },
+    warning: { bg: '#451a03', border: '#f59e0b', text: '#fef3c7' },
+    danger: { bg: '#450a0a', border: '#ef4444', text: '#fee2e2' }
+  };
+  const c = colors[tipo] || colors.info;
+
+  const toast = document.createElement('div');
+  toast.style.cssText = `pointer-events: auto; background: ${c.bg}; border: 1px solid ${c.border}; color: ${c.text}; padding: 0.75rem 0.9rem; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.45); font-size: 0.84rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.65rem;`;
+  toast.innerHTML = `
+    <div style="line-height: 1.35;">${mensaje}</div>
+    <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: ${c.text}; cursor: pointer; font-size: 1rem; line-height: 1; opacity: 0.8;">×</button>
+  `;
+  toastBox.appendChild(toast);
+
+  setTimeout(() => {
+    if (toast.parentElement) toast.remove();
+  }, 6500);
+}
+
+function usuarioEstaEditando() {
+  const active = document.activeElement;
+  if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return true;
+  const modales = ['modalProgramacion', 'modalHabilitar', 'modalImpedimento', 'modalDesarme', 'modalAuditoria', 'modalReforma', 'modalBuscarQR'];
+  return modales.some(id => {
+    const el = document.getElementById(id);
+    return el && el.style.display && el.style.display !== 'none';
+  });
+}
+
+function construirSnapshotSolicitudes(lista) {
+  const map = new Map();
+  (lista || []).forEach(s => {
+    map.set(s.id, {
+      estado: s.estado,
+      proveedorAsignado: s.proveedorAsignado || '',
+      numeroCorrelativo: s.numeroCorrelativo || s.id,
+      ubicacionTecnica: s.ubicacionTecnica || ''
+    });
+  });
+  return map;
+}
+
+async function ejecutarCicloPolling() {
+  const user = AppState.currentUser;
+  if (!user || document.visibilityState !== 'visible') return;
+
+  try {
+    let url = '/api/solicitudes';
+    if (user.rol === 'SOLICITANTE' || (user.rol === 'GESTIONADOR' && AppState.adminViewMode === 'SOLICITANTE')) {
+      url = `/api/solicitudes?solicitanteId=${encodeURIComponent(user.id)}`;
+    } else if (user.rol === 'EMPRESA_SERVICIO') {
+      url = `/api/solicitudes?proveedor=${encodeURIComponent(user.empresaNombre || '')}`;
+    }
+
+    const res = await fetch(url).then(r => r.json());
+    if (!res.ok || !Array.isArray(res.solicitudes)) return;
+
+    const nuevoMap = construirSnapshotSolicitudes(res.solicitudes);
+
+    if (_snapshotSolicitudes) {
+      let huboCambios = false;
+
+      nuevoMap.forEach((nuevo, id) => {
+        const prev = _snapshotSolicitudes.get(id);
+        if (!prev) {
+          huboCambios = true;
+          if (user.rol === 'GESTIONADOR' && AppState.adminViewMode !== 'SOLICITANTE') {
+            mostrarNotificacionToast(`🔔 <strong>Nuevo pedido:</strong> ${nuevo.numeroCorrelativo} · ${nuevo.ubicacionTecnica}`, 'info');
+          } else if (user.rol === 'EMPRESA_SERVICIO') {
+            mostrarNotificacionToast(`📦 <strong>Nueva orden asignada:</strong> ${nuevo.numeroCorrelativo} · ${nuevo.ubicacionTecnica}`, 'info');
+          }
+        } else if (prev.estado !== nuevo.estado) {
+          huboCambios = true;
+          if (nuevo.estado === 'DESARME_SOLICITADO' && user.rol === 'GESTIONADOR') {
+            mostrarNotificacionToast(`🚩 <strong>Desarme solicitado:</strong> ${nuevo.numeroCorrelativo}`, 'warning');
+          } else if (nuevo.estado === 'DESHABILITADO_HSE') {
+            mostrarNotificacionToast(`⛔ <strong>Alerta HSE:</strong> ${nuevo.numeroCorrelativo} fue deshabilitado`, 'danger');
+          } else if (nuevo.estado === 'PROGRAMADO' && user.rol === 'EMPRESA_SERVICIO') {
+            mostrarNotificacionToast(`📦 <strong>Orden programada:</strong> ${nuevo.numeroCorrelativo}`, 'info');
+          } else if (user.rol === 'SOLICITANTE' || AppState.adminViewMode === 'SOLICITANTE') {
+            mostrarNotificacionToast(`✅ <strong>Pedido ${nuevo.numeroCorrelativo}:</strong> cambió a <em>${nuevo.estado}</em>`, 'success');
+          }
+        }
+      });
+
+      if (huboCambios && !usuarioEstaEditando()) {
+        renderPortalPorRol();
+      }
+    }
+
+    _snapshotSolicitudes = nuevoMap;
+  } catch {
+    // Silencioso en caso de micro-corte de red
+  }
+}
+
+function iniciarPollingPedidos() {
+  if (_pollingIntervalId) return;
+  ejecutarCicloPolling();
+  _pollingIntervalId = setInterval(ejecutarCicloPolling, 15000);
+}
+
+function detenerPollingPedidos() {
+  if (_pollingIntervalId) {
+    clearInterval(_pollingIntervalId);
+    _pollingIntervalId = null;
+  }
+  _snapshotSolicitudes = null;
 }
 
 /* ========================================================

@@ -113,7 +113,8 @@ const INITIAL_DATA = {
   incidentesArea: [],
   tarifarios: TARIFARIOS_BASE,
   limitesMensuales: { ...LIMITES_MENSUALES_BASE },
-  usoApp: { totalLogins: 0, ultimosAccesos: [], porUsuario: {} }
+  usoApp: { totalLogins: 0, ultimosAccesos: [], porUsuario: {} },
+  actionLogs: []
 };
 
 export function getDb() {
@@ -139,6 +140,10 @@ export function getDb() {
     }
     if (!parsed.usoApp) {
       parsed.usoApp = { totalLogins: 0, ultimosAccesos: [], porUsuario: {} };
+      updated = true;
+    }
+    if (!Array.isArray(parsed.actionLogs)) {
+      parsed.actionLogs = [];
       updated = true;
     }
     if (updated) {
@@ -239,6 +244,9 @@ async function persistirEnSupabase(data) {
   if (data.usoApp) {
     await supabase.from('configuracion').upsert({ clave: 'uso_app', valor: data.usoApp }, { onConflict: 'clave' });
   }
+  if (Array.isArray(data.actionLogs)) {
+    await supabase.from('configuracion').upsert({ clave: 'action_logs', valor: data.actionLogs }, { onConflict: 'clave' });
+  }
 }
 
 export async function eliminarEmpresaEnSupabase(id) {
@@ -301,6 +309,8 @@ export async function cargarDesdeSupabaseSiExiste() {
       if (corr && corr.valor?.ultimo !== undefined) db.correlativo = corr.valor.ultimo;
       const uso = configs.find(c => c.clave === 'uso_app');
       if (uso && uso.valor) db.usoApp = uso.valor;
+      const logs = configs.find(c => c.clave === 'action_logs');
+      if (logs && Array.isArray(logs.valor)) db.actionLogs = logs.valor;
     }
     if (emps) {
       db.empresasServicio = emps.map(e => ({
