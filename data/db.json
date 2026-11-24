@@ -10,6 +10,16 @@
       "sector": "Administración General de Andamios y Paradas",
       "legajo": "50100",
       "centroCostos": "CC-SUP-00"
+    },
+    {
+      "id": "USR-ADM-DIEGO2026",
+      "nombre": "Diego2026",
+      "email": "diego2026@arauco.com",
+      "password": "scrypt$ba9ee47c225650c943c29c37f729d86e$ac541e78f8ec665a048552eb4ab226aef7b0a9162976080150991c65322a22868ea74e92a248af8e423e1ca9f1d7bcdd6c8113295999b3fdbf536c702e9847fd",
+      "rol": "GESTIONADOR",
+      "sector": "Administración General de Andamios y Paradas",
+      "legajo": "ADM-2026",
+      "centroCostos": "CC-SUP-00"
     }
   ],
   "empresasServicio": [],
@@ -156,5 +166,10 @@
     "limiteM3Mes": 1500,
     "limiteM2Mes": 600,
     "presupuestoMes": 0
+  },
+  "usoApp": {
+    "totalLogins": 0,
+    "ultimosAccesos": [],
+    "porUsuario": {}
   }
 }

@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste, eliminarEmpresaEnSupabase } from './db.js';
+import { getDb, saveDb, getNextNumeroCorrelativo, getNextTarjetaId, cargarDesdeSupabaseSiExiste, eliminarEmpresaEnSupabase, eliminarUsuarioEnSupabase, supabase, hashPassword, verifyPassword } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,9 +37,33 @@ app.post('/api/auth/login', (req, res) => {
   const db = getDb();
   const user = db.usuarios.find(u => u.email.toLowerCase() === (email || '').toLowerCase().trim());
 
-  if (!user || user.password !== password) {
+  if (!user || !verifyPassword(password, user.password)) {
     return res.status(401).json({ ok: false, error: 'Correo o contraseña incorrectos. Verifique sus credenciales.' });
   }
+
+  // Registrar uso de la app
+  const ahora = new Date().toISOString();
+  if (!db.usoApp) db.usoApp = { totalLogins: 0, ultimosAccesos: [], porUsuario: {} };
+  if (!db.usoApp.porUsuario) db.usoApp.porUsuario = {};
+  if (!Array.isArray(db.usoApp.ultimosAccesos)) db.usoApp.ultimosAccesos = [];
+
+  db.usoApp.totalLogins = (db.usoApp.totalLogins || 0) + 1;
+  const prevUser = db.usoApp.porUsuario[user.id] || { totalLogins: 0 };
+  db.usoApp.porUsuario[user.id] = {
+    ultimoLogin: ahora,
+    totalLogins: (prevUser.totalLogins || 0) + 1
+  };
+  db.usoApp.ultimosAccesos.unshift({
+    usuarioId: user.id,
+    nombre: user.nombre,
+    email: user.email,
+    rol: user.rol,
+    fecha: ahora
+  });
+  if (db.usoApp.ultimosAccesos.length > 30) {
+    db.usoApp.ultimosAccesos = db.usoApp.ultimosAccesos.slice(0, 30);
+  }
+  saveDb(db);
 
   const { password: _, ...userSafe } = user;
   res.json({ ok: true, user: userSafe });
@@ -92,7 +116,7 @@ app.post('/api/auth/register', (req, res) => {
     id: `USR-REG-${Date.now()}`,
     nombre: nombre.trim(),
     email: cleanEmail,
-    password: password,
+    password: hashPassword(password),
     rol,
     perfilTipo: perfil,
     sector: sectorFinal,
@@ -123,10 +147,10 @@ app.post('/api/auth/cambiar-password', (req, res) => {
   if (!user) {
     return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
   }
-  if (user.password !== passwordActual) {
+  if (!verifyPassword(passwordActual, user.password)) {
     return res.status(401).json({ ok: false, error: 'La contraseña actual ingresada es incorrecta' });
   }
-  user.password = passwordNueva;
+  user.password = hashPassword(passwordNueva);
   saveDb(db);
   res.json({ ok: true, mensaje: 'Contraseña actualizada correctamente' });
 });
@@ -195,7 +219,7 @@ app.post('/api/auth/restablecer-password', (req, res) => {
   }
 
   // Actualizar contraseña y limpiar estado de recuperación
-  user.password = passwordNueva;
+  user.password = hashPassword(passwordNueva);
   delete user.recuperacion;
   saveDb(db);
 
@@ -275,6 +299,83 @@ app.post('/api/configuracion/limites-mensuales', (req, res) => {
   };
   saveDb(db);
   res.json({ ok: true, limitesMensuales: db.limitesMensuales });
+});
+
+/* ========================================================
+   SECCIÓN ADMIN: USUARIOS, RESETEO DE CLAVES Y USO DE APP
+   ======================================================== */
+app.get('/api/admin/resumen', (req, res) => {
+  const db = getDb();
+  const uso = db.usoApp || { totalLogins: 0, ultimosAccesos: [], porUsuario: {} };
+  const porUsuario = uso.porUsuario || {};
+
+  const usuarios = (db.usuarios || []).map(({ password, ...u }) => ({
+    ...u,
+    ultimoLogin: porUsuario[u.id]?.ultimoLogin || null,
+    totalLogins: porUsuario[u.id]?.totalLogins || 0
+  }));
+
+  const solicitudes = db.solicitudes || [];
+  const activasEnPlanta = solicitudes.filter(s => ['HABILITADO', 'EN_ALQUILER'].includes(s.estado)).length;
+  const desarmadas = solicitudes.filter(s => s.estado === 'DESARMADO').length;
+
+  res.json({
+    ok: true,
+    usuarios,
+    usoApp: {
+      totalLogins: uso.totalLogins || 0,
+      ultimosAccesos: uso.ultimosAccesos || []
+    },
+    estadisticas: {
+      totalUsuarios: usuarios.length,
+      porRol: {
+        GESTIONADOR: usuarios.filter(u => u.rol === 'GESTIONADOR').length,
+        SOLICITANTE: usuarios.filter(u => u.rol === 'SOLICITANTE').length,
+        EMPRESA_SERVICIO: usuarios.filter(u => u.rol === 'EMPRESA_SERVICIO').length
+      },
+      totalSolicitudes: solicitudes.length,
+      activasEnPlanta,
+      desarmadas,
+      totalEmpresas: (db.empresasServicio || []).length,
+      modoDb: supabase ? 'Supabase PostgreSQL' : 'Local (db.json)'
+    }
+  });
+});
+
+app.post('/api/admin/usuarios/:id/reset-password', (req, res) => {
+  const { id } = req.params;
+  const { nuevaPassword } = req.body;
+  if (!nuevaPassword || String(nuevaPassword).length < 4) {
+    return res.status(400).json({ ok: false, error: 'La nueva contraseña debe tener al menos 4 caracteres.' });
+  }
+
+  const db = getDb();
+  const user = (db.usuarios || []).find(u => u.id === id);
+  if (!user) {
+    return res.status(404).json({ ok: false, error: 'Usuario no encontrado.' });
+  }
+
+  user.password = hashPassword(String(nuevaPassword));
+  saveDb(db);
+  res.json({ ok: true, mensaje: `Contraseña actualizada para ${user.nombre}` });
+});
+
+app.delete('/api/admin/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  if (id === 'USR-ADM-00' || id === 'USR-ADM-DIEGO2026') {
+    return res.status(400).json({ ok: false, error: 'No se puede eliminar una cuenta administradora principal.' });
+  }
+
+  const db = getDb();
+  const prevLen = (db.usuarios || []).length;
+  db.usuarios = (db.usuarios || []).filter(u => u.id !== id);
+  if (db.usuarios.length === prevLen) {
+    return res.status(404).json({ ok: false, error: 'Usuario no encontrado.' });
+  }
+
+  saveDb(db);
+  await eliminarUsuarioEnSupabase(id);
+  res.json({ ok: true });
 });
 
 /* ========================================================

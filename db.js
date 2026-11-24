@@ -1,7 +1,28 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+
+export function hashPassword(plain) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(plain), salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+
+export function verifyPassword(plain, stored) {
+  if (!stored || plain === undefined || plain === null) return false;
+  if (stored.startsWith('scrypt$')) {
+    const parts = stored.split('$');
+    if (parts.length !== 3) return false;
+    const [, salt, originalHash] = parts;
+    const derived = crypto.scryptSync(String(plain), salt, 64);
+    const originalBuf = Buffer.from(originalHash, 'hex');
+    if (derived.length !== originalBuf.length) return false;
+    return crypto.timingSafeEqual(derived, originalBuf);
+  }
+  return String(plain) === String(stored);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,13 +95,24 @@ const INITIAL_DATA = {
       sector: 'Administración General de Andamios y Paradas',
       legajo: '50100',
       centroCostos: 'CC-SUP-00'
+    },
+    {
+      id: 'USR-ADM-DIEGO2026',
+      nombre: 'Diego2026',
+      email: 'diego2026@arauco.com',
+      password: 'scrypt$ba9ee47c225650c943c29c37f729d86e$ac541e78f8ec665a048552eb4ab226aef7b0a9162976080150991c65322a22868ea74e92a248af8e423e1ca9f1d7bcdd6c8113295999b3fdbf536c702e9847fd',
+      rol: 'GESTIONADOR',
+      sector: 'Administración General de Andamios y Paradas',
+      legajo: 'ADM-2026',
+      centroCostos: 'CC-SUP-00'
     }
   ],
   empresasServicio: [],
   solicitudes: [],
   incidentesArea: [],
   tarifarios: TARIFARIOS_BASE,
-  limitesMensuales: { ...LIMITES_MENSUALES_BASE }
+  limitesMensuales: { ...LIMITES_MENSUALES_BASE },
+  usoApp: { totalLogins: 0, ultimosAccesos: [], porUsuario: {} }
 };
 
 export function getDb() {
@@ -102,6 +134,10 @@ export function getDb() {
     }
     if (!Array.isArray(parsed.empresasServicio)) {
       parsed.empresasServicio = [];
+      updated = true;
+    }
+    if (!parsed.usoApp) {
+      parsed.usoApp = { totalLogins: 0, ultimosAccesos: [], porUsuario: {} };
       updated = true;
     }
     if (updated) {
@@ -199,6 +235,9 @@ async function persistirEnSupabase(data) {
   if (data.correlativo !== undefined) {
     await supabase.from('configuracion').upsert({ clave: 'correlativo', valor: { ultimo: data.correlativo } }, { onConflict: 'clave' });
   }
+  if (data.usoApp) {
+    await supabase.from('configuracion').upsert({ clave: 'uso_app', valor: data.usoApp }, { onConflict: 'clave' });
+  }
 }
 
 export async function eliminarEmpresaEnSupabase(id) {
@@ -207,6 +246,15 @@ export async function eliminarEmpresaEnSupabase(id) {
     await supabase.from('empresas_servicio').delete().eq('id', id);
   } catch (err) {
     console.error('⚠️ Error eliminando EESS en Supabase:', err.message);
+  }
+}
+
+export async function eliminarUsuarioEnSupabase(id) {
+  if (!supabase) return;
+  try {
+    await supabase.from('usuarios').delete().eq('id', id);
+  } catch (err) {
+    console.error('⚠️ Error eliminando usuario en Supabase:', err.message);
   }
 }
 
@@ -250,6 +298,8 @@ export async function cargarDesdeSupabaseSiExiste() {
       if (lim && lim.valor) db.limitesMensuales = lim.valor;
       const corr = configs.find(c => c.clave === 'correlativo');
       if (corr && corr.valor?.ultimo !== undefined) db.correlativo = corr.valor.ultimo;
+      const uso = configs.find(c => c.clave === 'uso_app');
+      if (uso && uso.valor) db.usoApp = uso.valor;
     }
     if (emps) {
       db.empresasServicio = emps.map(e => ({
