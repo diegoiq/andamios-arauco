@@ -29,6 +29,5 @@ jobs:
           BASE_URL="${SUPABASE_URL%/}"
           curl -f -sS "${BASE_URL}/rest/v1/" \
             -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -o /dev/null
           echo "Ping exitoso a Supabase."
