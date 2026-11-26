@@ -26,8 +26,29 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          BASE_URL="${SUPABASE_URL%/}"
-          curl -f -sS "${BASE_URL}/rest/v1/" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -o /dev/null
-          echo "Ping exitoso a Supabase."
+          BASE_URL="$(printf '%s' "$SUPABASE_URL" | tr -d ' \r\n"'\''')"
+          BASE_URL="${BASE_URL%/}"
+          API_KEY="$(printf '%s' "$SUPABASE_KEY" | tr -d ' \r\n"'\''')"
+
+          if [[ ! "$BASE_URL" =~ ^https?:// ]]; then
+            echo "Error: SUPABASE_URL debe comenzar con https:// (ej: https://tu-proyecto.supabase.co)."
+            exit 1
+          fi
+
+          AUTH_ARGS=(-H "apikey: ${API_KEY}")
+          if [[ "$API_KEY" == eyJ* ]]; then
+            AUTH_ARGS+=(-H "Authorization: Bearer ${API_KEY}")
+          fi
+
+          HTTP_CODE=$(curl -sS -o /tmp/supabase_resp.txt -w "%{http_code}" \
+            "${BASE_URL}/rest/v1/solicitudes?select=id&limit=1" \
+            "${AUTH_ARGS[@]}")
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Error al consultar Supabase (HTTP $HTTP_CODE):"
+            cat /tmp/supabase_resp.txt
+            echo ""
+            exit 1
+          fi
+
+          echo "Ping exitoso a Supabase (HTTP $HTTP_CODE)."
