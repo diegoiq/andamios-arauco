@@ -21,13 +21,13 @@ jobs:
             exit 1
           fi
 
-      - name: Consultar tabla solicitudes en Supabase
+      - name: Ping a la API REST de Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           BASE_URL="${SUPABASE_URL%/}"
-          curl -f -sS "${BASE_URL}/rest/v1/solicitudes?select=id&limit=1" \
+          curl -f -sS "${BASE_URL}/rest/v1/" \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -o /dev/null
